@@ -1,9 +1,13 @@
 import { Estoque } from "./models/Estoque";
 import { ProdutoId } from "./models/Produto";
-import { LocalId } from "./models/Local";
 import { EstoqueService } from "./services/EstoqueService";
-import { ReservaService } from "./services/ReservaService";
 import { Reserva } from "./models/Reserva";
+import { ReservaService } from "./services/ReservaService";
+import { LocalId } from "./models/Local";
+
+// ==============================
+// ESTOQUES
+// ==============================
 
 const estoquePrincipal: Estoque = {
     id: "ESTOQUE_PRINCIPAL",
@@ -11,28 +15,57 @@ const estoquePrincipal: Estoque = {
     itens: [
         {
             produtoId: ProdutoId.MIX,
-            quantidade: 100,
-        },
-    ],
+            quantidade: 100
+        }
+    ]
 };
 
 const estoqueRodrigo: Estoque = {
     id: "ESTOQUE_RODRIGO",
     nome: "Estoque Rodrigo",
     responsavelId: "RODRIGO",
-    itens: [],
+    itens: []
 };
+
+// ==============================
+// TRANSFERÊNCIA
+// ==============================
+
+EstoqueService.remover(
+    estoquePrincipal,
+    ProdutoId.MIX,
+    60
+);
+
+EstoqueService.adicionar(
+    estoqueRodrigo,
+    ProdutoId.MIX,
+    60
+);
+
+// ==============================
+// RESERVAS
+// ==============================
 
 const reservas: Reserva[] = [];
 
-// Rodrigo pega 60 MIX
-EstoqueService.transferir(
-    estoquePrincipal,
+const reserva: Reserva = {
+    id: "RESERVA_1",
+    responsavelId: "RODRIGO",
+    localDestinoId: LocalId.BOULEVARD,
+    produtoId: ProdutoId.MIX,
+    quantidade: 20
+};
+
+ReservaService.criarReserva(
     estoqueRodrigo,
-    ProdutoId.MIX,
-    60,
-    "RODRIGO"
+    reservas,
+    reserva
 );
+
+// ==============================
+// ESTOQUE
+// ==============================
 
 console.log("=== ESTOQUE ===");
 
@@ -52,25 +85,65 @@ console.log(
     )
 );
 
-// Reserva 20 MIX para o Boulevard
-const reservaBoulevard: Reserva = {
-    id: crypto.randomUUID(),
-    responsavelId: "RODRIGO",
-    localDestinoId: LocalId.BOULEVARD,
-    produtoId: ProdutoId.MIX,
-    quantidade: 20,
-};
-
-ReservaService.criarReserva(
-    estoqueRodrigo,
-    reservas,
-    reservaBoulevard
-);
+// ==============================
+// RESERVAS
+// ==============================
 
 console.log("\n=== RESERVAS ===");
 console.log(reservas);
 
+// ==============================
+// QUANTIDADES
+// ==============================
+
 console.log("\n=== QUANTIDADES ===");
+
+console.log(
+    "Físico:",
+    EstoqueService.consultarQuantidade(
+        estoqueRodrigo,
+        ProdutoId.MIX
+    )
+);
+
+console.log(
+    "Reservado:",
+    ReservaService.quantidadeReservada(
+        reservas,
+        ProdutoId.MIX,
+        "RODRIGO"
+    )
+);
+
+console.log(
+    "Disponível:",
+    ReservaService.quantidadeDisponivel(
+        estoqueRodrigo,
+        reservas,
+        ProdutoId.MIX
+    )
+);
+
+// ==============================
+// CANCELAMENTO
+// ==============================
+
+console.log("\n=== CANCELANDO RESERVA ===");
+
+ReservaService.cancelarReserva(
+    reservas,
+    reserva.id,
+    "RODRIGO"
+);
+
+console.log("\nReservas após cancelamento:");
+console.log(reservas);
+
+// ==============================
+// QUANTIDADES APÓS CANCELAMENTO
+// ==============================
+
+console.log("\n=== QUANTIDADES APÓS CANCELAMENTO ===");
 
 console.log(
     "Físico:",

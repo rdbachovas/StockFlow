@@ -52,6 +52,27 @@ export class ReservaService {
         reservas.push(reserva);
     }
 
+    static cancelarReserva(
+        reservas: Reserva[],
+        reservaId: string,
+        responsavelId: string
+    ): void {
+
+        const indice = reservas.findIndex(
+            (reserva) =>
+                reserva.id === reservaId &&
+                reserva.responsavelId === responsavelId
+        );
+
+        if (indice === -1) {
+            throw new Error(
+                "Reserva não encontrada."
+            );
+        }
+
+        reservas.splice(indice, 1);
+    }
+
     static quantidadeReservada(
         reservas: Reserva[],
         produtoId: ProdutoId,
