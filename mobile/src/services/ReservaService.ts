@@ -1,6 +1,9 @@
 import { Estoque } from "../models/Estoque";
 import { ProdutoId } from "../models/Produto";
 import { Reserva, StatusReserva } from "../models/Reserva";
+import { EstoqueService } from "./EstoqueService";
+import { Movimentacao } from "../models/Movimentacao";
+import { MovimentacaoService } from "./MovimentacaoService";
 
 export class ReservaService {
 
@@ -82,7 +85,9 @@ export class ReservaService {
     }
 
     static concluirReserva(
+        estoque: Estoque,
         reservas: Reserva[],
+        movimentacoes: Movimentacao[],
         reservaId: string,
         responsavelId: string
     ): void {
@@ -104,6 +109,33 @@ export class ReservaService {
                 "A reserva não está ativa."
             );
         }
+
+        if (estoque.responsavelId !== responsavelId) {
+            throw new Error(
+                "O responsável pela reserva não corresponde ao estoque."
+            );
+        }
+
+        EstoqueService.remover(
+            estoque,
+            reserva.produtoId,
+            reserva.quantidade
+        );
+
+        const movimentacao: Movimentacao = {
+            id: `MOV_${movimentacoes.length + 1}`,
+            produtoId: reserva.produtoId,
+            quantidade: reserva.quantidade,
+            origemId: estoque.id,
+            destinoId: reserva.localDestinoId,
+            responsavelId: responsavelId,
+            data: new Date()
+        };
+
+        MovimentacaoService.registrar(
+            movimentacoes,
+            movimentacao
+        );
 
         reserva.status = StatusReserva.CONCLUIDA;
     }

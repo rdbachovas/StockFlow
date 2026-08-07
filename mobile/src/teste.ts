@@ -4,6 +4,8 @@ import { EstoqueService } from "./services/EstoqueService";
 import { Reserva, StatusReserva } from "./models/Reserva";
 import { ReservaService } from "./services/ReservaService";
 import { LocalId } from "./models/Local";
+import { Movimentacao } from "./models/Movimentacao";
+import { MovimentacaoService } from "./services/MovimentacaoService";
 
 // ==============================
 // ESTOQUES
@@ -28,7 +30,16 @@ const estoqueRodrigo: Estoque = {
 };
 
 // ==============================
+// ARRAYS DO SISTEMA
+// ==============================
+
+const reservas: Reserva[] = [];
+
+const movimentacoes: Movimentacao[] = [];
+
+// ==============================
 // TRANSFERÊNCIA
+// ESTOQUE PRINCIPAL → RODRIGO
 // ==============================
 
 EstoqueService.remover(
@@ -43,11 +54,22 @@ EstoqueService.adicionar(
     60
 );
 
-// ==============================
-// RESERVAS
-// ==============================
+MovimentacaoService.registrar(
+    movimentacoes,
+    {
+        id: "MOV_1",
+        produtoId: ProdutoId.MIX,
+        quantidade: 60,
+        origemId: estoquePrincipal.id,
+        destinoId: estoqueRodrigo.id,
+        responsavelId: "RODRIGO",
+        data: new Date()
+    }
+);
 
-const reservas: Reserva[] = [];
+// ==============================
+// RESERVA
+// ==============================
 
 const reserva: Reserva = {
     id: "RESERVA_1",
@@ -65,13 +87,13 @@ ReservaService.criarReserva(
 );
 
 // ==============================
-// ESTOQUE
+// ESTADO ANTES DA CONCLUSÃO
 // ==============================
 
-console.log("=== ESTOQUE ===");
+console.log("=== ANTES DA CONCLUSÃO ===");
 
 console.log(
-    "Principal:",
+    "Estoque Principal:",
     EstoqueService.consultarQuantidade(
         estoquePrincipal,
         ProdutoId.MIX
@@ -79,28 +101,7 @@ console.log(
 );
 
 console.log(
-    "Rodrigo:",
-    EstoqueService.consultarQuantidade(
-        estoqueRodrigo,
-        ProdutoId.MIX
-    )
-);
-
-// ==============================
-// RESERVAS
-// ==============================
-
-console.log("\n=== RESERVAS ===");
-console.log(reservas);
-
-// ==============================
-// QUANTIDADES
-// ==============================
-
-console.log("\n=== QUANTIDADES ===");
-
-console.log(
-    "Físico:",
+    "Estoque Rodrigo:",
     EstoqueService.consultarQuantidade(
         estoqueRodrigo,
         ProdutoId.MIX
@@ -125,33 +126,39 @@ console.log(
     )
 );
 
+console.log("\nReserva:");
+console.log(reserva);
+
 // ==============================
-// CANCELAMENTO
+// CONCLUSÃO DA RESERVA
 // ==============================
 
-console.log("\n=== CANCELANDO RESERVA ===");
+console.log("\n=== CONCLUINDO RESERVA ===");
 
-ReservaService.cancelarReserva(
+ReservaService.concluirReserva(
+    estoqueRodrigo,
     reservas,
+    movimentacoes,
     reserva.id,
     "RODRIGO"
 );
 
 // ==============================
-// RESERVA APÓS CANCELAMENTO
+// ESTADO APÓS CONCLUSÃO
 // ==============================
 
-console.log("\n=== RESERVAS APÓS CANCELAMENTO ===");
-console.log(reservas);
-
-// ==============================
-// QUANTIDADES APÓS CANCELAMENTO
-// ==============================
-
-console.log("\n=== QUANTIDADES APÓS CANCELAMENTO ===");
+console.log("\n=== APÓS A CONCLUSÃO ===");
 
 console.log(
-    "Físico:",
+    "Estoque Principal:",
+    EstoqueService.consultarQuantidade(
+        estoquePrincipal,
+        ProdutoId.MIX
+    )
+);
+
+console.log(
+    "Estoque Rodrigo:",
     EstoqueService.consultarQuantidade(
         estoqueRodrigo,
         ProdutoId.MIX
@@ -175,3 +182,17 @@ console.log(
         ProdutoId.MIX
     )
 );
+
+// ==============================
+// RESERVA CONCLUÍDA
+// ==============================
+
+console.log("\n=== RESERVA ===");
+console.log(reserva);
+
+// ==============================
+// MOVIMENTAÇÕES
+// ==============================
+
+console.log("\n=== MOVIMENTAÇÕES ===");
+console.log(movimentacoes);
