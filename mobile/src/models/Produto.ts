@@ -3,8 +3,9 @@ export enum CategoriaPelucia {
   PERSONAGENS = "PERSONAGENS",
   CAPIVARAS = "CAPIVARAS",
   BIG = "BIG",
-  STICH = "STICH",
+  STITCH = "STITCH",
   POKEMON = "POKEMON",
+  LABUBU = "LABUBU"
 }
 
 export enum TipoInsumo {
@@ -24,8 +25,9 @@ export enum ProdutoId {
   PERSONAGENS = "PERSONAGENS",
   CAPIVARAS = "CAPIVARAS",
   BIG = "BIG",
-  STICH = "STICH",
+  STITCH = "STITCH",
   POKEMON = "POKEMON",
+  LABUBU = "LABUBU",
 
   MILHO = "MILHO",
   CHOCOLATE = "CHOCOLATE",

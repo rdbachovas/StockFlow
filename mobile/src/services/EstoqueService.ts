@@ -1,63 +1,97 @@
 import { Estoque } from "../models/Estoque";
+import { EstoqueItem } from "../models/EstoqueItem";
 import { ProdutoId } from "../models/Produto";
+import { Movimentacao } from "../models/Movimentacao";
 
 export class EstoqueService {
-  static consultarQuantidade(
-    estoque: Estoque,
-    produtoId: ProdutoId
-  ): number {
-    const item = estoque.itens.find(
-      (item) => item.produtoId === produtoId
-    );
 
-    return item?.quantidade ?? 0;
-  }
+    static consultarQuantidade(
+        estoque: Estoque,
+        produtoId: ProdutoId
+    ): number {
+        const item = estoque.itens.find(
+            (item) => item.produtoId === produtoId
+        );
 
-  static adicionar(
-    estoque: Estoque,
-    produtoId: ProdutoId,
-    quantidade: number
-  ): void {
-    if (quantidade <= 0) {
-      throw new Error("A quantidade deve ser maior que zero.");
+        return item?.quantidade ?? 0;
     }
 
-    const item = estoque.itens.find(
-      (item) => item.produtoId === produtoId
-    );
+    static adicionar(
+        estoque: Estoque,
+        produtoId: ProdutoId,
+        quantidade: number
+    ): void {
+        if (quantidade <= 0) {
+            throw new Error("A quantidade deve ser maior que zero.");
+        }
 
-    if (item) {
-      item.quantidade += quantidade;
-      return;
+        const item = estoque.itens.find(
+            (item) => item.produtoId === produtoId
+        );
+
+        if (item) {
+            item.quantidade += quantidade;
+            return;
+        }
+
+        const novoItem: EstoqueItem = {
+            produtoId,
+            quantidade,
+        };
+
+        estoque.itens.push(novoItem);
     }
 
-    estoque.itens.push({
-      produtoId,
-      quantidade,
-    });
-  }
+    static remover(
+        estoque: Estoque,
+        produtoId: ProdutoId,
+        quantidade: number
+    ): void {
+        if (quantidade <= 0) {
+            throw new Error("A quantidade deve ser maior que zero.");
+        }
 
-  static remover(
-    estoque: Estoque,
-    produtoId: ProdutoId,
-    quantidade: number
-  ): void {
-    if (quantidade <= 0) {
-      throw new Error("A quantidade deve ser maior que zero.");
+        const item = estoque.itens.find(
+            (item) => item.produtoId === produtoId
+        );
+
+        if (!item) {
+            throw new Error("Produto não encontrado no estoque.");
+        }
+
+        if (item.quantidade < quantidade) {
+            throw new Error("Estoque insuficiente.");
+        }
+
+        item.quantidade -= quantidade;
     }
 
-    const item = estoque.itens.find(
-      (item) => item.produtoId === produtoId
-    );
+    static transferir(
+        origem: Estoque,
+        destino: Estoque,
+        produtoId: ProdutoId,
+        quantidade: number,
+        responsavelId: string
+    ): Movimentacao {
 
-    if (!item) {
-      throw new Error("Produto não encontrado no estoque.");
+        if (quantidade <= 0) {
+            throw new Error("A quantidade deve ser maior que zero.");
+        }
+
+        this.remover(origem, produtoId, quantidade);
+
+        this.adicionar(destino, produtoId, quantidade);
+
+        const movimentacao: Movimentacao = {
+            id: crypto.randomUUID(),
+            produtoId,
+            quantidade,
+            origemId: origem.id,
+            destinoId: destino.id,
+            responsavelId,
+            data: new Date(),
+        };
+
+        return movimentacao;
     }
-
-    if (item.quantidade < quantidade) {
-      throw new Error("Estoque insuficiente.");
-    }
-
-    item.quantidade -= quantidade;
-  }
 }
