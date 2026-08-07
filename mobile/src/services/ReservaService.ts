@@ -1,6 +1,6 @@
 import { Estoque } from "../models/Estoque";
 import { ProdutoId } from "../models/Produto";
-import { Reserva } from "../models/Reserva";
+import { Reserva, StatusReserva } from "../models/Reserva";
 
 export class ReservaService {
 
@@ -49,6 +49,8 @@ export class ReservaService {
             );
         }
 
+        reserva.status = StatusReserva.ATIVA;
+
         reservas.push(reserva);
     }
 
@@ -58,19 +60,52 @@ export class ReservaService {
         responsavelId: string
     ): void {
 
-        const indice = reservas.findIndex(
+        const reserva = reservas.find(
             (reserva) =>
                 reserva.id === reservaId &&
                 reserva.responsavelId === responsavelId
         );
 
-        if (indice === -1) {
+        if (!reserva) {
             throw new Error(
                 "Reserva não encontrada."
             );
         }
 
-        reservas.splice(indice, 1);
+        if (reserva.status !== StatusReserva.ATIVA) {
+            throw new Error(
+                "A reserva não está ativa."
+            );
+        }
+
+        reserva.status = StatusReserva.CANCELADA;
+    }
+
+    static concluirReserva(
+        reservas: Reserva[],
+        reservaId: string,
+        responsavelId: string
+    ): void {
+
+        const reserva = reservas.find(
+            (reserva) =>
+                reserva.id === reservaId &&
+                reserva.responsavelId === responsavelId
+        );
+
+        if (!reserva) {
+            throw new Error(
+                "Reserva não encontrada."
+            );
+        }
+
+        if (reserva.status !== StatusReserva.ATIVA) {
+            throw new Error(
+                "A reserva não está ativa."
+            );
+        }
+
+        reserva.status = StatusReserva.CONCLUIDA;
     }
 
     static quantidadeReservada(
@@ -83,7 +118,8 @@ export class ReservaService {
             .filter(
                 (reserva) =>
                     reserva.produtoId === produtoId &&
-                    reserva.responsavelId === responsavelId
+                    reserva.responsavelId === responsavelId &&
+                    reserva.status === StatusReserva.ATIVA
             )
             .reduce(
                 (total, reserva) =>

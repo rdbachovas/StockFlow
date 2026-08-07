@@ -1,7 +1,7 @@
 import { Estoque } from "./models/Estoque";
 import { ProdutoId } from "./models/Produto";
 import { EstoqueService } from "./services/EstoqueService";
-import { Reserva } from "./models/Reserva";
+import { Reserva, StatusReserva } from "./models/Reserva";
 import { ReservaService } from "./services/ReservaService";
 import { LocalId } from "./models/Local";
 
@@ -54,7 +54,8 @@ const reserva: Reserva = {
     responsavelId: "RODRIGO",
     localDestinoId: LocalId.BOULEVARD,
     produtoId: ProdutoId.MIX,
-    quantidade: 20
+    quantidade: 20,
+    status: StatusReserva.ATIVA
 };
 
 ReservaService.criarReserva(
@@ -136,7 +137,11 @@ ReservaService.cancelarReserva(
     "RODRIGO"
 );
 
-console.log("\nReservas após cancelamento:");
+// ==============================
+// RESERVA APÓS CANCELAMENTO
+// ==============================
+
+console.log("\n=== RESERVAS APÓS CANCELAMENTO ===");
 console.log(reservas);
 
 // ==============================
