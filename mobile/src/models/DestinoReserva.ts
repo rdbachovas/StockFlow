@@ -1,0 +1,6 @@
+export enum DestinoReservaId {
+    BOULEVARD = "BOULEVARD",
+    AEROPORTO = "AEROPORTO",
+    MERCADOS = "MERCADOS",
+    SUPERMAGO_BOA_VISTA = "SUPERMAGO_BOA_VISTA"
+}

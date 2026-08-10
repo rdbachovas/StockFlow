@@ -1,18 +1,106 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import React from "react";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import {
+    Stack
+} from "expo-router";
 
-SplashScreen.preventAutoHideAsync();
+import {
+    AppProvider
+} from "../context/AppContext";
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
-  );
+export default function RootLayout() {
+
+    return (
+        <AppProvider>
+
+            <Stack>
+
+                <Stack.Screen
+                    name="index"
+                    options={{
+                        headerShown: false
+                    }}
+                />
+
+                <Stack.Screen
+                    name="abastecimento"
+                    options={{
+                        title: "Abastecimento"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="estoque-principal"
+                    options={{
+                        title: "Estoque Principal"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="ajuste-estoque-principal"
+                    options={{
+                        title: "Atualizar Estoque Principal"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="historico-estoque-principal"
+                    options={{
+                        title: "Histórico do Principal"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="estoque-pessoal"
+                    options={{
+                        title: "Estoque Pessoal"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="consumo-carrinho"
+                    options={{
+                        title: "Consumo do Carrinho"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="reservas"
+                    options={{
+                        title: "Reservas"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="historico-reservas"
+                    options={{
+                        title: "Histórico de Reservas"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="devolucao"
+                    options={{
+                        title: "Devolução"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="historico"
+                    options={{
+                        title: "Histórico"
+                    }}
+                />
+
+                <Stack.Screen
+                    name="historico-estoque-pessoal"
+                    options={{
+                        title: "Movimentações do Estoque"
+                    }}
+                />
+
+            </Stack>
+
+        </AppProvider>
+    );
 }
