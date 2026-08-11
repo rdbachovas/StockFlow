@@ -3,6 +3,11 @@ import {
     RegistrarRetiradaRequestDto,
     RegistrarRetiradaResponseDto
 } from "../dtos/RetiradaDto";
+import {
+    CancelarReservaRequestDto,
+    CriarReservaRequestDto,
+    ReservaResponseDto
+} from "../dtos/ReservaDto";
 
 export class ErroApi extends Error {
     constructor(
@@ -81,5 +86,49 @@ export class ApiService {
         }
 
         return await resposta.json() as RegistrarRetiradaResponseDto;
+    }
+
+    static async criarReserva(
+        reserva: CriarReservaRequestDto
+    ): Promise<ReservaResponseDto> {
+        return await this.post<ReservaResponseDto>(
+            "/api/v1/reservas",
+            reserva
+        );
+    }
+
+    static async cancelarReserva(
+        reservaId: string,
+        cancelamento: CancelarReservaRequestDto
+    ): Promise<ReservaResponseDto> {
+        return await this.post<ReservaResponseDto>(
+            `/api/v1/reservas/${encodeURIComponent(reservaId)}/cancelamento`,
+            cancelamento
+        );
+    }
+
+    private static async post<T>(
+        caminho: string,
+        corpo: unknown
+    ): Promise<T> {
+        let resposta: Response;
+
+        try {
+            resposta = await fetch(`${this.apiUrl()}${caminho}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(corpo)
+            });
+        } catch {
+            throw new ErroApi("Não foi possível conectar ao servidor.");
+        }
+
+        if (!resposta.ok) {
+            throw await this.erro(resposta);
+        }
+
+        return await resposta.json() as T;
     }
 }

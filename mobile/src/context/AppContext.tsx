@@ -38,7 +38,7 @@ import {
     EstadoSincronizacao,
     InicializacaoService
 } from "../services/InicializacaoService";
-import { ReservaService } from "../services/ReservaService";
+import { ReservaRemotaService } from "../services/ReservaRemotaService";
 import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
 
 interface AppContextValue {
@@ -78,13 +78,13 @@ interface AppContextValue {
     criarReserva:
         (
             reserva: Reserva
-        ) => void;
+        ) => Promise<void>;
 
     cancelarReserva:
         (
             reservaId: string,
             responsavelId: string
-        ) => void;
+        ) => Promise<void>;
 
     registrarDevolucao:
         (
@@ -323,66 +323,32 @@ export function AppProvider({
 
     const criarReserva = (
         reserva: Reserva
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const reservas =
-            clonarReservas(
-                dadosAtuais.reservas
-            );
-
-        const estoque =
-            reserva.responsavelId ===
-                UsuarioId.RODRIGO
-                ? dadosAtuais.estoqueRodrigo
-                : reserva.responsavelId ===
-                    UsuarioId.CESAR
-                    ? dadosAtuais.estoqueCesar
-                    : undefined;
-
-        if (!estoque) {
-            throw new Error(
-                "Responsável inválido."
-            );
-        }
-
-        ReservaService.criarReserva(
-            estoque,
-            reservas,
-            reserva
-        );
-
-        return {
-            ...dadosAtuais,
-            reservas
-        };
-        });
+    ): Promise<void> => {
+        return ReservaRemotaService
+            .criar(
+                reserva,
+                estadoSincronizacao
+            )
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const cancelarReserva = (
         reservaId: string,
         responsavelId: string
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const reservas =
-            clonarReservas(
-                dadosAtuais.reservas
-            );
-
-        ReservaService.cancelarReserva(
-            reservas,
-            reservaId,
-            responsavelId
-        );
-
-        return {
-            ...dadosAtuais,
-            reservas
-        };
-        });
+    ): Promise<void> => {
+        return ReservaRemotaService
+            .cancelar(
+                reservaId,
+                responsavelId,
+                estadoSincronizacao
+            )
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const registrarDevolucao = (

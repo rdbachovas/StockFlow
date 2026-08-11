@@ -1,5 +1,6 @@
 import React, {
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -147,6 +148,11 @@ export function ReservasScreen() {
         null
     );
 
+    const [criando, setCriando] = useState(false);
+    const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+    const [operacaoErro, setOperacaoErro] = useState<"CRIACAO" | "CANCELAMENTO">("CRIACAO");
+    const operacaoEmAndamentoRef = useRef(false);
+
     const [
         mensagemErro,
         setMensagemErro
@@ -281,10 +287,15 @@ export function ReservasScreen() {
         );
 
     const confirmarReserva =
-        () => {
+        async () => {
+
+            if (operacaoEmAndamentoRef.current) {
+                return;
+            }
 
             setMensagemErro(null);
             setMensagemSucesso(null);
+            setOperacaoErro("CRIACAO");
 
             const valor =
                 Number(
@@ -328,7 +339,10 @@ export function ReservasScreen() {
 
             try {
 
-                criarReserva(
+                operacaoEmAndamentoRef.current = true;
+                setCriando(true);
+
+                await criarReserva(
                     reserva
                 );
 
@@ -340,24 +354,37 @@ export function ReservasScreen() {
 
             } catch (erro) {
 
+                setOperacaoErro("CRIACAO");
+
                 setMensagemErro(
                     erro instanceof Error
                         ? erro.message
                         : "Erro ao criar reserva."
                 );
+            } finally {
+                operacaoEmAndamentoRef.current = false;
+                setCriando(false);
             }
         };
 
     const cancelar = (
         reserva: Reserva
-    ) => {
+    ): Promise<void> => {
 
-        try {
+        if (operacaoEmAndamentoRef.current) {
+            return Promise.resolve();
+        }
 
-            cancelarReserva(
-                reserva.id,
-                reserva.responsavelId
-            );
+        const executar = async () => {
+            try {
+
+                operacaoEmAndamentoRef.current = true;
+                setCancelandoId(reserva.id);
+
+                await cancelarReserva(
+                    reserva.id,
+                    reserva.responsavelId
+                );
 
             setMensagemErro(null);
 
@@ -365,14 +392,22 @@ export function ReservasScreen() {
                 "Reserva cancelada. O restante voltou a ficar livre."
             );
 
-        } catch (erro) {
+            } catch (erro) {
 
-            setMensagemErro(
-                erro instanceof Error
-                    ? erro.message
-                    : "Erro ao cancelar reserva."
-            );
-        }
+                setOperacaoErro("CANCELAMENTO");
+
+                setMensagemErro(
+                    erro instanceof Error
+                        ? erro.message
+                        : "Erro ao cancelar reserva."
+                );
+            } finally {
+                operacaoEmAndamentoRef.current = false;
+                setCancelandoId(null);
+            }
+        };
+
+        return executar();
     };
 
     return (
@@ -648,7 +683,7 @@ export function ReservasScreen() {
                         ? (
                             <View style={styles.erro}>
                                 <Text style={styles.mensagemTitulo}>
-                                    Não foi possível criar
+                                    {operacaoErro === "CRIACAO" ? "Não foi possível criar" : "Não foi possível cancelar"}
                                 </Text>
 
                                 <Text>
@@ -676,13 +711,17 @@ export function ReservasScreen() {
                 }
 
                 <TouchableOpacity
-                    style={styles.botaoCriar}
+                    style={[
+                        styles.botaoCriar,
+                        (criando || cancelandoId !== null) && styles.botaoDesabilitado
+                    ]}
                     onPress={
                         confirmarReserva
                     }
+                    disabled={criando || cancelandoId !== null}
                 >
                     <Text style={styles.botaoCriarTexto}>
-                        Criar reserva
+                        {criando ? "Enviando..." : "Criar reserva"}
                     </Text>
                 </TouchableOpacity>
 
@@ -771,16 +810,20 @@ export function ReservasScreen() {
                                         </View>
 
                                         <TouchableOpacity
-                                            style={styles.cancelar}
+                                            style={[
+                                                styles.cancelar,
+                                                (criando || cancelandoId !== null) && styles.botaoDesabilitado
+                                            ]}
                                             onPress={
                                                 () =>
                                                     cancelar(
                                                         reserva
                                                     )
                                             }
+                                            disabled={criando || cancelandoId !== null}
                                         >
                                             <Text style={styles.cancelarTexto}>
-                                                Cancelar reserva
+                                                {cancelandoId === reserva.id ? "Enviando..." : "Cancelar reserva"}
                                             </Text>
                                         </TouchableOpacity>
 
@@ -966,6 +1009,10 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         alignItems: "center"
+    },
+
+    botaoDesabilitado: {
+        opacity: 0.6
     },
 
     botaoCriarTexto: {
