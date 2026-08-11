@@ -128,6 +128,27 @@ public class Reserva {
         return restante;
     }
 
+    public void registrarLiberacao(
+            int quantidade,
+            OffsetDateTime data
+    ) {
+        if (status != StatusReserva.ATIVA) {
+            throw new IllegalStateException("A reserva não está ativa.");
+        }
+        if (quantidade <= 0 || quantidade > getQuantidadeRestante()) {
+            throw new IllegalArgumentException(
+                    "Quantidade de liberação inválida."
+            );
+        }
+
+        quantidadeLiberada += quantidade;
+        adicionarEvento(TipoEventoReserva.LIBERACAO, quantidade, data);
+        if (getQuantidadeRestante() == 0) {
+            status = StatusReserva.CONCLUIDA;
+            adicionarEvento(TipoEventoReserva.CONCLUSAO, 0, data);
+        }
+    }
+
     private void adicionarEvento(
             TipoEventoReserva tipo,
             int quantidade,
