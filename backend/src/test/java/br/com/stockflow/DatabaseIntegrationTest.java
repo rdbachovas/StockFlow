@@ -71,7 +71,7 @@ class DatabaseIntegrationTest {
         );
 
         assertThat(itensDoPrincipal).isEqualTo(12);
-        assertThat(migrations).isEqualTo(3);
+        assertThat(migrations).isEqualTo(4);
     }
 
     @Test

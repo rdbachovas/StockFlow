@@ -38,4 +38,17 @@ public interface EstoqueItemRepository
             @Param("estoqueId") String estoqueId,
             @Param("produtoId") String produtoId
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT item
+            FROM EstoqueItem item
+            JOIN FETCH item.produto
+            WHERE item.estoque.id = :estoqueId
+              AND item.produto.id = :produtoId
+            """)
+    Optional<EstoqueItem> buscarUmParaAtualizacao(
+            @Param("estoqueId") String estoqueId,
+            @Param("produtoId") String produtoId
+    );
 }
