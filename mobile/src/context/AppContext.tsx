@@ -7,13 +7,6 @@ import React, {
 } from "react";
 
 import {
-    StyleSheet,
-    Text,
-    View
-} from "react-native";
-
-import {
-    criarDadosIniciais,
     DadosIniciais
 } from "../data/AppData";
 
@@ -41,10 +34,16 @@ import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
 import { DevolucaoEstoqueService } from "../services/DevolucaoEstoqueService";
 import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
 import { PersistenceService } from "../services/PersistenceService";
+import {
+    EstadoSincronizacao,
+    InicializacaoService
+} from "../services/InicializacaoService";
 import { ReservaService } from "../services/ReservaService";
 import { RetiradaEstoqueService } from "../services/RetiradaEstoqueService";
 
 interface AppContextValue {
+
+    estadoSincronizacao: EstadoSincronizacao;
 
     estoquePrincipal: Estoque;
 
@@ -165,9 +164,9 @@ export function AppProvider({
     ] = useState(false);
 
     const [
-        erroHidratacao,
-        setErroHidratacao
-    ] = useState<string | null>(null);
+        estadoSincronizacao,
+        setEstadoSincronizacao
+    ] = useState<EstadoSincronizacao>("CARREGANDO");
 
     useEffect(
         () => {
@@ -175,31 +174,17 @@ export function AppProvider({
 
             const hidratar = async () => {
                 const resultado =
-                    await PersistenceService
+                    await InicializacaoService
                         .carregar();
 
                 if (!ativo) {
                     return;
                 }
 
-                if (
-                    resultado.tipo ===
-                    "VALIDO"
-                ) {
-                    setDados(resultado.dados);
-                } else if (
-                    resultado.tipo ===
-                    "AUSENTE"
-                ) {
-                    setDados(
-                        criarDadosIniciais()
-                    );
-                } else {
-                    setErroHidratacao(
-                        resultado.motivo
-                    );
-                }
-
+                setDados(resultado.dados);
+                setEstadoSincronizacao(
+                    resultado.estadoSincronizacao
+                );
                 setHidratado(true);
             };
 
@@ -216,8 +201,7 @@ export function AppProvider({
         () => {
             if (
                 !hidratado ||
-                !dados ||
-                erroHidratacao
+                !dados
             ) {
                 return;
             }
@@ -235,7 +219,6 @@ export function AppProvider({
         },
         [
             dados,
-            erroHidratacao,
             hidratado
         ]
     );
@@ -618,31 +601,16 @@ export function AppProvider({
 
     if (
         !hidratado ||
-        (!dados && !erroHidratacao)
-    ) {
-        return null;
-    }
-
-    if (
-        erroHidratacao ||
         !dados
     ) {
-        return (
-            <View style={styles.erroContainer}>
-                <Text style={styles.erroTitulo}>
-                    Não foi possível carregar os dados
-                </Text>
-
-                <Text style={styles.erroTexto}>
-                    {erroHidratacao}
-                </Text>
-            </View>
-        );
+        return null;
     }
 
     return (
         <AppContext.Provider
             value={{
+
+                estadoSincronizacao,
 
                 estoquePrincipal:
                     dados.estoquePrincipal,
@@ -708,24 +676,3 @@ export function useApp():
 
     return contexto;
 }
-
-const styles = StyleSheet.create({
-    erroContainer: {
-        alignItems: "center",
-        flex: 1,
-        justifyContent: "center",
-        padding: 24
-    },
-
-    erroTitulo: {
-        fontSize: 18,
-        fontWeight: "600",
-        marginBottom: 8,
-        textAlign: "center"
-    },
-
-    erroTexto: {
-        fontSize: 14,
-        textAlign: "center"
-    }
-});

@@ -32,6 +32,8 @@ export interface ConsumoCarrinho {
 
     responsavelId: string;
 
+    estoqueOrigemId?: string;
+
     itens: ItemConsumoCarrinho[];
 
     data: Date;

@@ -2,6 +2,7 @@ import { DestinoReservaId } from "./DestinoReserva";
 import { ProdutoId } from "./Produto";
 
 export interface ParcelaReservaDevolucao {
+    reservaId?: string;
     destinoId: DestinoReservaId;
     quantidade: number;
 }
@@ -10,6 +11,13 @@ export interface ItemDevolucaoEstoque {
     produtoId: ProdutoId;
 
     quantidadeLivre: number;
+
+    quantidadeReservada?: number;
+    quantidadeTotal?: number;
+    saldoPessoalAnterior?: number;
+    saldoPessoalPosterior?: number;
+    saldoPrincipalAnterior?: number;
+    saldoPrincipalPosterior?: number;
 
     reservas: ParcelaReservaDevolucao[];
 }
