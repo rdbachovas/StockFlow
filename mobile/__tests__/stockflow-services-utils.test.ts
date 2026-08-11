@@ -13,6 +13,7 @@ import {
 } from "../src/models/Local";
 
 import {
+    CategoriaPelucia,
     ProdutoId
 } from "../src/models/Produto";
 
@@ -303,7 +304,7 @@ describe(
                     MaquinaService
                         .podeReceber(
                             maquina,
-                            ProdutoId.MIX
+                            CategoriaPelucia.MIX
                         )
                 ).toBe(
                     true
@@ -326,7 +327,7 @@ describe(
                     MaquinaService
                         .podeReceber(
                             maquina,
-                            ProdutoId.CAPIVARAS
+                            CategoriaPelucia.CAPIVARAS
                         )
                 ).toBe(
                     true
@@ -349,7 +350,7 @@ describe(
                     MaquinaService
                         .podeReceber(
                             maquina,
-                            ProdutoId.BIG
+                            CategoriaPelucia.BIG
                         )
                 ).toBe(
                     false
@@ -372,7 +373,7 @@ describe(
                     MaquinaService
                         .podeReceber(
                             maquina,
-                            ProdutoId.BIG
+                            CategoriaPelucia.BIG
                         )
                 ).toBe(
                     true
@@ -395,7 +396,7 @@ describe(
                     MaquinaService
                         .podeReceber(
                             maquina,
-                            ProdutoId.MIX
+                            CategoriaPelucia.MIX
                         )
                 ).toBe(
                     false

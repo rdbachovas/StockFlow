@@ -2,11 +2,19 @@ import React, {
     createContext,
     ReactNode,
     useContext,
+    useEffect,
     useState
 } from "react";
 
 import {
-    criarDadosIniciais
+    StyleSheet,
+    Text,
+    View
+} from "react-native";
+
+import {
+    criarDadosIniciais,
+    DadosIniciais
 } from "../data/AppData";
 
 import { Abastecimento } from "../models/Abastecimento";
@@ -32,6 +40,7 @@ import { AbastecimentoService } from "../services/AbastecimentoService";
 import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
 import { DevolucaoEstoqueService } from "../services/DevolucaoEstoqueService";
 import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
+import { PersistenceService } from "../services/PersistenceService";
 import { ReservaService } from "../services/ReservaService";
 import { RetiradaEstoqueService } from "../services/RetiradaEstoqueService";
 
@@ -146,31 +155,135 @@ export function AppProvider({
     const [
         dados,
         setDados
-    ] = useState(
-        criarDadosIniciais
+    ] = useState<DadosIniciais | null>(
+        null
     );
+
+    const [
+        hidratado,
+        setHidratado
+    ] = useState(false);
+
+    const [
+        erroHidratacao,
+        setErroHidratacao
+    ] = useState<string | null>(null);
+
+    useEffect(
+        () => {
+            let ativo = true;
+
+            const hidratar = async () => {
+                const resultado =
+                    await PersistenceService
+                        .carregar();
+
+                if (!ativo) {
+                    return;
+                }
+
+                if (
+                    resultado.tipo ===
+                    "VALIDO"
+                ) {
+                    setDados(resultado.dados);
+                } else if (
+                    resultado.tipo ===
+                    "AUSENTE"
+                ) {
+                    setDados(
+                        criarDadosIniciais()
+                    );
+                } else {
+                    setErroHidratacao(
+                        resultado.motivo
+                    );
+                }
+
+                setHidratado(true);
+            };
+
+            void hidratar();
+
+            return () => {
+                ativo = false;
+            };
+        },
+        []
+    );
+
+    useEffect(
+        () => {
+            if (
+                !hidratado ||
+                !dados ||
+                erroHidratacao
+            ) {
+                return;
+            }
+
+            void PersistenceService
+                .salvar(dados)
+                .catch(
+                    (erro: unknown) => {
+                        console.error(
+                            "Não foi possível salvar o estado.",
+                            erro
+                        );
+                    }
+                );
+        },
+        [
+            dados,
+            erroHidratacao,
+            hidratado
+        ]
+    );
+
+    const atualizarDados = (
+        atualizador:
+            (
+                dadosAtuais: DadosIniciais
+            ) => DadosIniciais
+    ): void => {
+        setDados(
+            (dadosAtuais) => {
+                if (!dadosAtuais) {
+                    throw new Error(
+                        "O estado ainda não foi carregado."
+                    );
+                }
+
+                return atualizador(
+                    dadosAtuais
+                );
+            }
+        );
+    };
 
     const registrarRetirada = (
         retirada: RetiradaEstoque
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const principal =
             clonarEstoque(
-                dados.estoquePrincipal
+                dadosAtuais.estoquePrincipal
             );
 
         const rodrigo =
             clonarEstoque(
-                dados.estoqueRodrigo
+                dadosAtuais.estoqueRodrigo
             );
 
         const cesar =
             clonarEstoque(
-                dados.estoqueCesar
+                dadosAtuais.estoqueCesar
             );
 
         const retiradas = [
-            ...dados.retiradas
+            ...dadosAtuais.retiradas
         ];
 
         const destino =
@@ -195,8 +308,8 @@ export function AppProvider({
             retirada
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
 
             estoquePrincipal:
                 principal,
@@ -208,6 +321,7 @@ export function AppProvider({
                 cesar,
 
             retiradas
+        };
         });
     };
 
@@ -215,23 +329,25 @@ export function AppProvider({
         abastecimento: Abastecimento
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const rodrigo =
             clonarEstoque(
-                dados.estoqueRodrigo
+                dadosAtuais.estoqueRodrigo
             );
 
         const cesar =
             clonarEstoque(
-                dados.estoqueCesar
+                dadosAtuais.estoqueCesar
             );
 
         const reservas =
             clonarReservas(
-                dados.reservas
+                dadosAtuais.reservas
             );
 
         const abastecimentos = [
-            ...dados.abastecimentos
+            ...dadosAtuais.abastecimentos
         ];
 
         const estoque =
@@ -256,8 +372,8 @@ export function AppProvider({
             abastecimento
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
 
             estoqueRodrigo:
                 rodrigo,
@@ -268,6 +384,7 @@ export function AppProvider({
             reservas,
 
             abastecimentos
+        };
         });
     };
 
@@ -275,18 +392,20 @@ export function AppProvider({
         reserva: Reserva
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const reservas =
             clonarReservas(
-                dados.reservas
+                dadosAtuais.reservas
             );
 
         const estoque =
             reserva.responsavelId ===
                 UsuarioId.RODRIGO
-                ? dados.estoqueRodrigo
+                ? dadosAtuais.estoqueRodrigo
                 : reserva.responsavelId ===
                     UsuarioId.CESAR
-                    ? dados.estoqueCesar
+                    ? dadosAtuais.estoqueCesar
                     : undefined;
 
         if (!estoque) {
@@ -301,9 +420,10 @@ export function AppProvider({
             reserva
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
             reservas
+        };
         });
     };
 
@@ -312,9 +432,11 @@ export function AppProvider({
         responsavelId: string
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const reservas =
             clonarReservas(
-                dados.reservas
+                dadosAtuais.reservas
             );
 
         ReservaService.cancelarReserva(
@@ -323,9 +445,10 @@ export function AppProvider({
             responsavelId
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
             reservas
+        };
         });
     };
 
@@ -333,28 +456,30 @@ export function AppProvider({
         devolucao: DevolucaoEstoque
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const principal =
             clonarEstoque(
-                dados.estoquePrincipal
+                dadosAtuais.estoquePrincipal
             );
 
         const rodrigo =
             clonarEstoque(
-                dados.estoqueRodrigo
+                dadosAtuais.estoqueRodrigo
             );
 
         const cesar =
             clonarEstoque(
-                dados.estoqueCesar
+                dadosAtuais.estoqueCesar
             );
 
         const reservas =
             clonarReservas(
-                dados.reservas
+                dadosAtuais.reservas
             );
 
         const devolucoes = [
-            ...dados.devolucoes
+            ...dadosAtuais.devolucoes
         ];
 
         const estoquePessoal =
@@ -380,8 +505,8 @@ export function AppProvider({
             devolucao
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
 
             estoquePrincipal:
                 principal,
@@ -395,6 +520,7 @@ export function AppProvider({
             reservas,
 
             devolucoes
+        };
         });
     };
 
@@ -403,13 +529,15 @@ export function AppProvider({
             SolicitacaoMovimentoEstoquePrincipal
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const principal =
             clonarEstoque(
-                dados.estoquePrincipal
+                dadosAtuais.estoquePrincipal
             );
 
         const movimentos = [
-            ...dados.movimentosEstoquePrincipal
+            ...dadosAtuais.movimentosEstoquePrincipal
         ];
 
         MovimentoEstoquePrincipalService.registrar(
@@ -418,14 +546,15 @@ export function AppProvider({
             solicitacao
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
 
             estoquePrincipal:
                 principal,
 
             movimentosEstoquePrincipal:
                 movimentos
+        };
         });
     };
 
@@ -434,18 +563,20 @@ export function AppProvider({
             SolicitacaoConsumoCarrinho
     ): void => {
 
+        atualizarDados((dadosAtuais) => {
+
         const rodrigo =
             clonarEstoque(
-                dados.estoqueRodrigo
+                dadosAtuais.estoqueRodrigo
             );
 
         const cesar =
             clonarEstoque(
-                dados.estoqueCesar
+                dadosAtuais.estoqueCesar
             );
 
         const consumos = [
-            ...dados.consumosCarrinho
+            ...dadosAtuais.consumosCarrinho
         ];
 
         const estoque =
@@ -470,8 +601,8 @@ export function AppProvider({
             solicitacao
         );
 
-        setDados({
-            ...dados,
+        return {
+            ...dadosAtuais,
 
             estoqueRodrigo:
                 rodrigo,
@@ -481,8 +612,33 @@ export function AppProvider({
 
             consumosCarrinho:
                 consumos
+        };
         });
     };
+
+    if (
+        !hidratado ||
+        (!dados && !erroHidratacao)
+    ) {
+        return null;
+    }
+
+    if (
+        erroHidratacao ||
+        !dados
+    ) {
+        return (
+            <View style={styles.erroContainer}>
+                <Text style={styles.erroTitulo}>
+                    Não foi possível carregar os dados
+                </Text>
+
+                <Text style={styles.erroTexto}>
+                    {erroHidratacao}
+                </Text>
+            </View>
+        );
+    }
 
     return (
         <AppContext.Provider
@@ -552,3 +708,24 @@ export function useApp():
 
     return contexto;
 }
+
+const styles = StyleSheet.create({
+    erroContainer: {
+        alignItems: "center",
+        flex: 1,
+        justifyContent: "center",
+        padding: 24
+    },
+
+    erroTitulo: {
+        fontSize: 18,
+        fontWeight: "600",
+        marginBottom: 8,
+        textAlign: "center"
+    },
+
+    erroTexto: {
+        fontSize: 14,
+        textAlign: "center"
+    }
+});
