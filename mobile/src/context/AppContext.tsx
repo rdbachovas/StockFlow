@@ -39,7 +39,7 @@ import {
     InicializacaoService
 } from "../services/InicializacaoService";
 import { ReservaService } from "../services/ReservaService";
-import { RetiradaEstoqueService } from "../services/RetiradaEstoqueService";
+import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
 
 interface AppContextValue {
 
@@ -68,7 +68,7 @@ interface AppContextValue {
     registrarRetirada:
         (
             retirada: RetiradaEstoque
-        ) => void;
+        ) => Promise<void>;
 
     registrarAbastecimento:
         (
@@ -246,66 +246,16 @@ export function AppProvider({
 
     const registrarRetirada = (
         retirada: RetiradaEstoque
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const principal =
-            clonarEstoque(
-                dadosAtuais.estoquePrincipal
-            );
-
-        const rodrigo =
-            clonarEstoque(
-                dadosAtuais.estoqueRodrigo
-            );
-
-        const cesar =
-            clonarEstoque(
-                dadosAtuais.estoqueCesar
-            );
-
-        const retiradas = [
-            ...dadosAtuais.retiradas
-        ];
-
-        const destino =
-            retirada.responsavelId ===
-                UsuarioId.RODRIGO
-                ? rodrigo
-                : retirada.responsavelId ===
-                    UsuarioId.CESAR
-                    ? cesar
-                    : undefined;
-
-        if (!destino) {
-            throw new Error(
-                "Responsável inválido."
-            );
-        }
-
-        RetiradaEstoqueService.registrar(
-            principal,
-            destino,
-            retiradas,
-            retirada
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoquePrincipal:
-                principal,
-
-            estoqueRodrigo:
-                rodrigo,
-
-            estoqueCesar:
-                cesar,
-
-            retiradas
-        };
-        });
+    ): Promise<void> => {
+        return RetiradaRemotaService
+            .registrar(
+                retirada,
+                estadoSincronizacao
+            )
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const registrarAbastecimento = (

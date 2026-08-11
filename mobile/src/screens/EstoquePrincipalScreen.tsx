@@ -1,5 +1,6 @@
 import React, {
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -34,7 +35,7 @@ interface Props {
     registrarRetirada:
         (
             retirada: RetiradaEstoque
-        ) => void;
+        ) => Promise<void>;
 }
 
 export function EstoquePrincipalScreen({
@@ -71,6 +72,13 @@ export function EstoquePrincipalScreen({
     ] = useState<
         string | null
     >(null);
+
+    const [
+        enviando,
+        setEnviando
+    ] = useState(false);
+
+    const enviandoRef = useRef(false);
 
     const estoqueDestino =
         responsavel ===
@@ -155,7 +163,11 @@ export function EstoquePrincipalScreen({
     };
 
     const confirmar =
-        () => {
+        async () => {
+
+            if (enviandoRef.current) {
+                return;
+            }
 
             setErro(null);
             setSucesso(null);
@@ -195,7 +207,10 @@ export function EstoquePrincipalScreen({
 
             try {
 
-                registrarRetirada(
+                enviandoRef.current = true;
+                setEnviando(true);
+
+                await registrarRetirada(
                     retirada
                 );
 
@@ -212,6 +227,9 @@ export function EstoquePrincipalScreen({
                         ? e.message
                         : "Erro ao registrar retirada."
                 );
+            } finally {
+                enviandoRef.current = false;
+                setEnviando(false);
             }
         };
 
@@ -510,15 +528,19 @@ export function EstoquePrincipalScreen({
             }
 
             <TouchableOpacity
-                style={styles.botao}
+                style={[
+                    styles.botao,
+                    enviando && styles.botaoDesabilitado
+                ]}
                 onPress={
                     confirmar
                 }
+                disabled={enviando}
             >
                 <Text
                     style={styles.botaoTexto}
                 >
-                    Confirmar retirada
+                    {enviando ? "Enviando..." : "Confirmar retirada"}
                 </Text>
             </TouchableOpacity>
 
@@ -685,6 +707,10 @@ const styles =
             borderRadius: 12,
             padding: 16,
             alignItems: "center"
+        },
+
+        botaoDesabilitado: {
+            opacity: 0.6
         },
 
         botaoTexto: {
