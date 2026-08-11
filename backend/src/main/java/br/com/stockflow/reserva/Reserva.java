@@ -92,6 +92,13 @@ public class Reserva {
     }
 
     public void registrarUtilizacao(int quantidade) {
+        registrarUtilizacao(quantidade, OffsetDateTime.now());
+    }
+
+    public void registrarUtilizacao(
+            int quantidade,
+            OffsetDateTime data
+    ) {
         if (status != StatusReserva.ATIVA) {
             throw new IllegalStateException("A reserva não está ativa.");
         }
@@ -102,8 +109,10 @@ public class Reserva {
         }
 
         quantidadeUtilizada += quantidade;
+        adicionarEvento(TipoEventoReserva.UTILIZACAO, quantidade, data);
         if (getQuantidadeRestante() == 0) {
             status = StatusReserva.CONCLUIDA;
+            adicionarEvento(TipoEventoReserva.CONCLUSAO, 0, data);
         }
     }
 

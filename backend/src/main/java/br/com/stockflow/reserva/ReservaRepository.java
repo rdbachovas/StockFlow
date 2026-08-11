@@ -1,5 +1,7 @@
 package br.com.stockflow.reserva;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,4 +38,20 @@ public interface ReservaRepository extends JpaRepository<Reserva, UUID> {
             WHERE reserva.id = :id
             """)
     Optional<Reserva> buscarParaCancelamento(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT reserva
+            FROM Reserva reserva
+            JOIN FETCH reserva.responsavel
+            JOIN FETCH reserva.produto
+            WHERE reserva.responsavel.id = :responsavelId
+              AND reserva.produto.id IN :produtoIds
+              AND reserva.status = br.com.stockflow.reserva.StatusReserva.ATIVA
+            ORDER BY reserva.produto.id, reserva.dataCriacao, reserva.id
+            """)
+    List<Reserva> buscarAtivasParaAbastecimento(
+            @Param("responsavelId") String responsavelId,
+            @Param("produtoIds") Collection<String> produtoIds
+    );
 }
