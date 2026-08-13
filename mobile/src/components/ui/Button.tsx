@@ -16,7 +16,7 @@ import {
     Typography
 } from "../../constants/theme";
 
-type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "danger" | "dangerGhost" | "ghost";
 
 interface Props {
     label: string;
@@ -87,6 +87,10 @@ const styles = StyleSheet.create({
         backgroundColor: Palette.danger,
         borderColor: Palette.danger
     },
+    dangerGhost: {
+        backgroundColor: "transparent",
+        borderColor: "transparent"
+    },
     ghost: {
         backgroundColor: "transparent",
         borderColor: "transparent"
@@ -103,6 +107,9 @@ const styles = StyleSheet.create({
     },
     dangerLabel: {
         color: Palette.surface
+    },
+    dangerGhostLabel: {
+        color: Palette.danger
     },
     ghostLabel: {
         color: Palette.primary

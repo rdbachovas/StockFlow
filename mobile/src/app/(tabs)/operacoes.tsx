@@ -28,10 +28,7 @@ export default function OperationsPage() {
             <Section title="Abastecimento">
                 <Button
                     label="Abastecer local"
-                    onPress={() => router.push({
-                        pathname: "/",
-                        params: { abastecer: "1" }
-                    })}
+                    onPress={() => router.push("/abastecimento")}
                 />
             </Section>
 
@@ -40,6 +37,7 @@ export default function OperationsPage() {
                     <Button label="Retirar do Principal" variant="secondary" onPress={() => router.push("/estoque-principal")} />
                     <Button label="Entrada ou ajuste" variant="secondary" onPress={() => router.push("/ajuste-estoque-principal")} />
                     <Button label="Consumo do carrinho" variant="secondary" onPress={() => router.push("/consumo-carrinho")} />
+                    <Button label="Devolução ao Principal" variant="secondary" onPress={() => router.push("/devolucao")} />
                 </View>
             </Section>
 

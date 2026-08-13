@@ -4,986 +4,249 @@ import React, {
 } from "react";
 
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
+    Pressable,
     StyleSheet,
     Text,
-    TextInput,
-    TouchableOpacity,
     View
 } from "react-native";
 
+import { QuantityRow } from "../components/domain/QuantityRow";
+import { BottomActionBar } from "../components/layout/BottomActionBar";
+import { Screen } from "../components/layout/Screen";
+import { Section } from "../components/layout/Section";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Chip } from "../components/ui/Chip";
+import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import {
+    Palette,
+    Spacing,
+    Typography
+} from "../constants/theme";
 import { Abastecimento } from "../models/Abastecimento";
 import { Estoque } from "../models/Estoque";
 import { ItemAbastecimento } from "../models/ItemAbastecimento";
 import { LocalId } from "../models/Local";
-
 import {
     CategoriaPelucia,
     ProdutoId
 } from "../models/Produto";
-
 import { Reserva } from "../models/Reserva";
-
+import { UsuarioId } from "../models/Usuario";
 import { MaquinaService } from "../services/MaquinaService";
 import { ReservaService } from "../services/ReservaService";
+import { nomeProduto } from "../utils/ProdutoUtils";
 
 interface Props {
     localId: LocalId;
-
-    responsavelId: string;
-
+    localNome: string;
+    responsavelId: UsuarioId;
     estoque: Estoque;
-
     reservas: Reserva[];
-
-    registrarAbastecimento:
-        (
-            abastecimento: Abastecimento
-        ) => void;
+    registrarAbastecimento: (abastecimento: Abastecimento) => void;
+    onChangeLocal?: () => void;
+    onChangeResponsible?: (responsavel: UsuarioId) => void;
 }
 
-function categoriaParaProduto(
-    categoria: CategoriaPelucia
-): ProdutoId {
-
-    switch (categoria) {
-
-        case CategoriaPelucia.MIX:
-            return ProdutoId.MIX;
-
-        case CategoriaPelucia.PERSONAGENS:
-            return ProdutoId.PERSONAGENS;
-
-        case CategoriaPelucia.CAPIVARAS:
-            return ProdutoId.CAPIVARAS;
-
-        case CategoriaPelucia.BIG:
-            return ProdutoId.BIG;
-
-        case CategoriaPelucia.STITCH:
-            return ProdutoId.STITCH;
-
-        case CategoriaPelucia.POKEMON:
-            return ProdutoId.POKEMON;
-
-        case CategoriaPelucia.LABUBU:
-            return ProdutoId.LABUBU;
-    }
+function categoriaParaProduto(categoria: CategoriaPelucia): ProdutoId {
+    return categoria as unknown as ProdutoId;
 }
 
 export function AbastecimentoLocalScreen({
     localId,
+    localNome,
     responsavelId,
     estoque,
     reservas,
-    registrarAbastecimento
+    registrarAbastecimento,
+    onChangeLocal,
+    onChangeResponsible
 }: Props) {
+    const maquinas = useMemo(() => MaquinaService.listarPorLocal(localId), [localId]);
+    const destinoReserva = useMemo(() => ReservaService.destinoReservaDoLocal(localId), [localId]);
+    const [quantidades, setQuantidades] = useState<Record<string, string>>({});
+    const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
+    const [mensagemErro, setMensagemErro] = useState<string | null>(null);
+    const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+    const [revisando, setRevisando] = useState(false);
 
-    const maquinas =
-        useMemo(
-            () =>
-                MaquinaService.listarPorLocal(
-                    localId
-                ),
-            [localId]
-        );
+    const categorias = useMemo(() => Array.from(new Set(
+        maquinas.flatMap((maquina) => maquina.categoriasPermitidas)
+    )), [maquinas]);
+    const saldos = useMemo(() => categorias.map((categoria) => {
+        const produtoId = categoriaParaProduto(categoria);
+        const fisico = estoque.itens.find((item) => item.produtoId === produtoId)?.quantidade ?? 0;
+        const reservadoTotal = ReservaService.quantidadeReservada(reservas, produtoId, responsavelId);
+        const reservadoDestino = ReservaService.quantidadeReservadaNoDestino(reservas, produtoId, responsavelId, destinoReserva);
+        const livre = ReservaService.quantidadeDisponivel(estoque, reservas, produtoId);
+        return { categoria, produtoId, fisico, reservadoTotal, reservadoDestino, livre, podeUsarAqui: livre + reservadoDestino };
+    }), [categorias, destinoReserva, estoque, reservas, responsavelId]);
 
-    const destinoReserva =
-        useMemo(
-            () =>
-                ReservaService
-                    .destinoReservaDoLocal(
-                        localId
-                    ),
-            [localId]
-        );
-
-    const [
-        quantidades,
-        setQuantidades
-    ] = useState<
-        Record<string, string>
-    >({});
-
-    const [
-        mensagemSucesso,
-        setMensagemSucesso
-    ] = useState<string | null>(
-        null
-    );
-
-    const [
-        mensagemErro,
-        setMensagemErro
-    ] = useState<string | null>(
-        null
-    );
-
-    const categoriasDoLocal =
-        useMemo(
-            () => {
-
-                const categorias =
-                    new Set<
-                        CategoriaPelucia
-                    >();
-
-                for (
-                    const maquina
-                    of maquinas
-                ) {
-
-                    for (
-                        const categoria
-                        of maquina.categoriasPermitidas
-                    ) {
-
-                        categorias.add(
-                            categoria
-                        );
-                    }
-                }
-
-                return Array.from(
-                    categorias
-                );
-            },
-            [maquinas]
-        );
-
-    const estoquePorCategoria =
-        useMemo(
-            () => {
-
-                return categoriasDoLocal.map(
-                    (categoria) => {
-
-                        const produtoId =
-                            categoriaParaProduto(
-                                categoria
-                            );
-
-                        const fisico =
-                            estoque.itens.find(
-                                (item) =>
-                                    item.produtoId ===
-                                    produtoId
-                            )?.quantidade ?? 0;
-
-                        const reservadoTotal =
-                            ReservaService
-                                .quantidadeReservada(
-                                    reservas,
-                                    produtoId,
-                                    responsavelId
-                                );
-
-                        const reservadoDestino =
-                            ReservaService
-                                .quantidadeReservadaNoDestino(
-                                    reservas,
-                                    produtoId,
-                                    responsavelId,
-                                    destinoReserva
-                                );
-
-                        const livre =
-                            ReservaService
-                                .quantidadeDisponivel(
-                                    estoque,
-                                    reservas,
-                                    produtoId
-                                );
-
-                        const podeUsarAqui =
-                            livre +
-                            reservadoDestino;
-
-                        return {
-                            categoria,
-                            produtoId,
-                            fisico,
-                            reservadoTotal,
-                            reservadoDestino,
-                            livre,
-                            podeUsarAqui
-                        };
-                    }
-                );
-            },
-            [
-                categoriasDoLocal,
-                estoque,
-                reservas,
-                responsavelId,
-                destinoReserva
-            ]
-        );
-
-    const gerarChave = (
-        maquinaId: string,
-        categoria: CategoriaPelucia
-    ): string => {
-
-        return `${maquinaId}_${categoria}`;
+    const chave = (maquinaId: string, categoria: CategoriaPelucia) => `${maquinaId}_${categoria}`;
+    const itens = useMemo<ItemAbastecimento[]>(() => maquinas.flatMap((maquina) =>
+        maquina.categoriasPermitidas
+            .map((categoria) => ({
+                maquinaId: maquina.id,
+                produtoId: categoriaParaProduto(categoria),
+                quantidade: Number(quantidades[chave(maquina.id, categoria)] || 0)
+            }))
+            .filter((item) => Number.isInteger(item.quantidade) && item.quantidade > 0)
+    ), [maquinas, quantidades]);
+    const total = itens.reduce((soma, item) => soma + item.quantidade, 0);
+    const digitadoPorProduto = itens.reduce<Record<string, number>>((totais, item) => ({
+        ...totais,
+        [item.produtoId]: (totais[item.produtoId] ?? 0) + item.quantidade
+    }), {});
+    const disponivel = (categoria: CategoriaPelucia) => {
+        const produtoId = categoriaParaProduto(categoria);
+        const permitido = saldos.find((saldo) => saldo.produtoId === produtoId)?.podeUsarAqui ?? 0;
+        return permitido - (digitadoPorProduto[produtoId] ?? 0);
     };
 
-    const alterarQuantidade = (
-        maquinaId: string,
-        categoria: CategoriaPelucia,
-        valor: string
-    ) => {
-
-        const somenteNumeros =
-            valor.replace(
-                /[^0-9]/g,
-                ""
-            );
-
-        const chave =
-            gerarChave(
-                maquinaId,
-                categoria
-            );
-
-        setMensagemSucesso(null);
+    const revisar = () => {
         setMensagemErro(null);
-
-        setQuantidades(
-            (anterior) => ({
-                ...anterior,
-                [chave]:
-                    somenteNumeros
-            })
-        );
+        setMensagemSucesso(null);
+        if (itens.length === 0) {
+            setMensagemErro("Informe pelo menos uma quantidade.");
+            return;
+        }
+        setRevisando(true);
     };
 
-    const itensPreenchidos =
-        useMemo(
-            (): ItemAbastecimento[] => {
-
-                const itens:
-                    ItemAbastecimento[] = [];
-
-                for (
-                    const maquina
-                    of maquinas
-                ) {
-
-                    for (
-                        const categoria
-                        of maquina.categoriasPermitidas
-                    ) {
-
-                        const chave =
-                            gerarChave(
-                                maquina.id,
-                                categoria
-                            );
-
-                        const valor =
-                            quantidades[
-                                chave
-                            ];
-
-                        if (!valor) {
-                            continue;
-                        }
-
-                        const quantidade =
-                            Number(valor);
-
-                        if (
-                            !Number.isInteger(
-                                quantidade
-                            ) ||
-                            quantidade <= 0
-                        ) {
-                            continue;
-                        }
-
-                        itens.push({
-                            maquinaId:
-                                maquina.id,
-
-                            produtoId:
-                                categoriaParaProduto(
-                                    categoria
-                                ),
-
-                            quantidade
-                        });
-                    }
-                }
-
-                return itens;
-            },
-            [
-                maquinas,
-                quantidades
-            ]
-        );
-
-    const total =
-        useMemo(
-            () =>
-                itensPreenchidos.reduce(
-                    (soma, item) =>
-                        soma +
-                        item.quantidade,
-                    0
-                ),
-            [itensPreenchidos]
-        );
-
-    const totalPorProdutoDigitado =
-        useMemo(
-            () => {
-
-                const totais =
-                    new Map<
-                        ProdutoId,
-                        number
-                    >();
-
-                for (
-                    const item
-                    of itensPreenchidos
-                ) {
-
-                    const atual =
-                        totais.get(
-                            item.produtoId
-                        ) ?? 0;
-
-                    totais.set(
-                        item.produtoId,
-                        atual +
-                        item.quantidade
-                    );
-                }
-
-                return totais;
-            },
-            [itensPreenchidos]
-        );
-
-    const restanteParaDestino = (
-        categoria: CategoriaPelucia
-    ): number => {
-
-        const produtoId =
-            categoriaParaProduto(
-                categoria
-            );
-
-        const informacao =
-            estoquePorCategoria.find(
-                (item) =>
-                    item.produtoId ===
-                    produtoId
-            );
-
-        const permitido =
-            informacao
-                ?.podeUsarAqui ?? 0;
-
-        const digitado =
-            totalPorProdutoDigitado.get(
-                produtoId
-            ) ?? 0;
-
-        return (
-            permitido -
-            digitado
-        );
-    };
-
-    const confirmarAbastecimento =
-        () => {
-
-            setMensagemErro(null);
-            setMensagemSucesso(null);
-
-            if (
-                itensPreenchidos.length ===
-                0
-            ) {
-
-                setMensagemErro(
-                    "Informe pelo menos uma quantidade."
-                );
-
-                return;
-            }
-
-            const abastecimento:
-                Abastecimento = {
-
-                id:
-                    `AB_${Date.now()}`,
-
-                localId,
-
-                responsavelId,
-
-                itens:
-                    itensPreenchidos,
-
-                data:
-                    new Date()
-            };
-
-            try {
-
-                const totalRegistrado =
-                    total;
-
-                registrarAbastecimento(
-                    abastecimento
-                );
-
-                setQuantidades({});
-
-                setMensagemSucesso(
-                    `${totalRegistrado} pelúcias registradas com sucesso.`
-                );
-
-            } catch (erro) {
-
-                setMensagemErro(
-                    erro instanceof Error
-                        ? erro.message
-                        : "Erro ao registrar abastecimento."
-                );
-            }
+    const confirmar = () => {
+        setMensagemErro(null);
+        setMensagemSucesso(null);
+        const abastecimento: Abastecimento = {
+            id: `AB_${Date.now()}`,
+            localId,
+            responsavelId,
+            itens,
+            data: new Date()
         };
+        try {
+            registrarAbastecimento(abastecimento);
+            setQuantidades({});
+            setRevisando(false);
+            setMensagemSucesso(`${total} pelúcias registradas com sucesso.`);
+        } catch (caughtError) {
+            setMensagemErro(caughtError instanceof Error ? caughtError.message : "Erro ao registrar abastecimento.");
+        }
+    };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
+        <View style={styles.container}>
+            <Screen contentContainerStyle={styles.content}>
+                <Card style={styles.contextCard}>
+                    <View style={styles.contextContent}>
+                        <Text style={styles.stepLabel}>1. Local</Text>
+                        <Text style={styles.contextValue}>{localNome}</Text>
+                    </View>
+                    {onChangeLocal ? <Button label="Alterar" variant="ghost" onPress={onChangeLocal} /> : null}
+                </Card>
 
-            behavior={
-                Platform.OS === "ios"
-                    ? "padding"
-                    : undefined
-            }
-        >
+                {onChangeResponsible ? (
+                    <Section title="2. Responsável">
+                        <View style={styles.chips}>
+                            <Chip label="Rodrigo" selected={responsavelId === UsuarioId.RODRIGO} onPress={() => onChangeResponsible(UsuarioId.RODRIGO)} />
+                            <Chip label="Cesar" selected={responsavelId === UsuarioId.CESAR} onPress={() => onChangeResponsible(UsuarioId.CESAR)} />
+                        </View>
+                    </Section>
+                ) : (
+                    <Text style={styles.responsible}>Responsável: {responsavelId === UsuarioId.RODRIGO ? "Rodrigo" : "Cesar"}</Text>
+                )}
 
-            <ScrollView
-                contentContainerStyle={
-                    styles.conteudo
-                }
-            >
-
-                <Text
-                    style={styles.titulo}
-                >
-                    Abastecimento
-                </Text>
-
-                <Text
-                    style={styles.local}
-                >
-                    {localId}
-                </Text>
-
-                <Text
-                    style={styles.secaoTitulo}
-                >
-                    Estoque para este abastecimento
-                </Text>
-
-                <View
-                    style={styles.estoqueCategorias}
-                >
-
-                    {
-                        estoquePorCategoria.map(
-                            (item) => {
-
-                                const restante =
-                                    restanteParaDestino(
-                                        item.categoria
-                                    );
-
+                {revisando ? (
+                    <Section title="4. Revisão" description="Confira as quantidades antes de confirmar.">
+                        <Card style={styles.reviewCard}>
+                            {itens.map((item) => {
+                                const maquina = maquinas.find((candidate) => candidate.id === item.maquinaId);
                                 return (
-                                    <View
-                                        key={
-                                            item.produtoId
-                                        }
-                                        style={
-                                            styles.estoqueCategoria
-                                        }
-                                    >
-
-                                        <Text
-                                            style={styles.categoriaNome}
-                                        >
-                                            {item.categoria}
-                                        </Text>
-
-                                        <View
-                                            style={styles.linhaResumo}
-                                        >
-                                            <Text style={styles.resumoLabel}>
-                                                Físico
-                                            </Text>
-
-                                            <Text style={styles.resumoValor}>
-                                                {item.fisico}
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={styles.linhaResumo}
-                                        >
-                                            <Text style={styles.resumoLabel}>
-                                                Reservado para este destino
-                                            </Text>
-
-                                            <Text style={styles.resumoValor}>
-                                                {item.reservadoDestino}
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={styles.linhaResumo}
-                                        >
-                                            <Text style={styles.resumoLabel}>
-                                                Livre
-                                            </Text>
-
-                                            <Text style={styles.resumoValor}>
-                                                {item.livre}
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={[
-                                                styles.linhaResumo,
-                                                styles.linhaDestaque
-                                            ]}
-                                        >
-                                            <Text style={styles.destaqueLabel}>
-                                                Pode usar aqui
-                                            </Text>
-
-                                            <Text style={styles.destaqueValor}>
-                                                {item.podeUsarAqui}
-                                            </Text>
-                                        </View>
-
-                                        {
-                                            restante !==
-                                            item.podeUsarAqui
-                                                ? (
-                                                    <Text
-                                                        style={[
-                                                            styles.saldoProjetado,
-
-                                                            restante < 0 &&
-                                                            styles.saldoNegativo
-                                                        ]}
-                                                    >
-                                                        Restante após preencher: {restante}
-                                                    </Text>
-                                                )
-                                                : null
-                                        }
-
+                                    <View key={`${item.maquinaId}-${item.produtoId}`} style={styles.reviewRow}>
+                                        <View><Text style={styles.reviewProduct}>{nomeProduto(item.produtoId)}</Text><Text style={styles.reviewMachine}>{maquina?.nome ?? item.maquinaId}</Text></View>
+                                        <Text style={styles.reviewQuantity}>{item.quantidade}</Text>
                                     </View>
                                 );
-                            }
-                        )
-                    }
+                            })}
+                        </Card>
+                        <Button label="Editar quantidades" variant="secondary" onPress={() => setRevisando(false)} style={styles.editButton} />
+                    </Section>
+                ) : (
+                    <>
+                        <Section title={onChangeResponsible ? "3. Quantidades" : "2. Quantidades"}>
+                            <Pressable onPress={() => setDetalhesAbertos(!detalhesAbertos)} style={({ pressed }) => [styles.detailsToggle, pressed && styles.pressed]}>
+                                <Text style={styles.detailsToggleText}>Detalhes do estoque</Text>
+                                <Text style={styles.chevron}>{detalhesAbertos ? "⌃" : "⌄"}</Text>
+                            </Pressable>
+                            {detalhesAbertos ? (
+                                <Card style={styles.balanceCard}>
+                                    {saldos.map((saldo) => (
+                                        <View key={saldo.produtoId} style={styles.balanceBlock}>
+                                            <Text style={styles.balanceProduct}>{nomeProduto(saldo.produtoId)}</Text>
+                                            <Text style={styles.balanceText}>Físico {saldo.fisico} · Reservado {saldo.reservadoTotal} · Livre {saldo.livre}</Text>
+                                            <Text style={styles.usableText}>Pode usar aqui: {saldo.podeUsarAqui}</Text>
+                                        </View>
+                                    ))}
+                                </Card>
+                            ) : null}
+                        </Section>
 
-                </View>
-
-                <Text
-                    style={[
-                        styles.secaoTitulo,
-                        styles.maquinasTitulo
-                    ]}
-                >
-                    Máquinas
-                </Text>
-
-                {
-                    maquinas.map(
-                        (maquina) => (
-
-                            <View
-                                key={
-                                    maquina.id
-                                }
-                                style={
-                                    styles.maquina
-                                }
-                            >
-
-                                <Text
-                                    style={styles.nomeMaquina}
-                                >
-                                    {maquina.nome}
-                                </Text>
-
-                                {
-                                    maquina.categoriasPermitidas.map(
-                                        (categoria) => {
-
-                                            const chave =
-                                                gerarChave(
-                                                    maquina.id,
-                                                    categoria
-                                                );
-
-                                            const restante =
-                                                restanteParaDestino(
-                                                    categoria
-                                                );
-
-                                            return (
-                                                <View
-                                                    key={
-                                                        chave
-                                                    }
-                                                    style={
-                                                        styles.linhaProduto
-                                                    }
-                                                >
-
-                                                    <View
-                                                        style={
-                                                            styles.produtoInfo
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.nomeProduto
-                                                            }
-                                                        >
-                                                            {categoria}
-                                                        </Text>
-
-                                                        <Text
-                                                            style={[
-                                                                styles.produtoDisponivel,
-
-                                                                restante < 0 &&
-                                                                styles.saldoNegativo
-                                                            ]}
-                                                        >
-                                                            Restante para este destino: {restante}
-                                                        </Text>
-                                                    </View>
-
-                                                    <TextInput
-                                                        style={
-                                                            styles.input
-                                                        }
-
-                                                        value={
-                                                            quantidades[
-                                                                chave
-                                                            ] ?? ""
-                                                        }
-
-                                                        onChangeText={
-                                                            (valor) =>
-                                                                alterarQuantidade(
-                                                                    maquina.id,
-                                                                    categoria,
-                                                                    valor
-                                                                )
-                                                        }
-
-                                                        keyboardType="number-pad"
-
-                                                        placeholder="0"
-                                                    />
-
-                                                </View>
-                                            );
-                                        }
-                                    )
-                                }
-
-                            </View>
-                        )
-                    )
-                }
-
-                {
-                    mensagemErro
-                        ? (
-                            <View style={styles.erro}>
-                                <Text style={styles.erroTitulo}>
-                                    Não foi possível registrar
-                                </Text>
-
-                                <Text style={styles.erroTexto}>
-                                    {mensagemErro}
-                                </Text>
-                            </View>
-                        )
-                        : null
-                }
-
-                {
-                    mensagemSucesso
-                        ? (
-                            <View style={styles.sucesso}>
-                                <Text style={styles.sucessoTitulo}>
-                                    ✓ Abastecimento registrado
-                                </Text>
-
-                                <Text style={styles.sucessoTexto}>
-                                    {mensagemSucesso}
-                                </Text>
-                            </View>
-                        )
-                        : null
-                }
-
-                <View
-                    style={styles.totalCard}
-                >
-                    <Text
-                        style={styles.totalLabel}
-                    >
-                        Total do abastecimento
-                    </Text>
-
-                    <Text
-                        style={styles.totalValor}
-                    >
-                        {total} pelúcias
-                    </Text>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.botao}
-                    onPress={
-                        confirmarAbastecimento
-                    }
-                >
-                    <Text
-                        style={styles.textoBotao}
-                    >
-                        Confirmar abastecimento
-                    </Text>
-                </TouchableOpacity>
-
-            </ScrollView>
-
-        </KeyboardAvoidingView>
+                        {maquinas.map((maquina) => (
+                            <Card key={maquina.id} style={styles.machineCard}>
+                                <Text style={styles.machineName}>{maquina.nome}</Text>
+                                {maquina.categoriasPermitidas.map((categoria) => {
+                                    const inputKey = chave(maquina.id, categoria);
+                                    const restante = disponivel(categoria);
+                                    return (
+                                        <QuantityRow
+                                            key={inputKey}
+                                            name={nomeProduto(categoriaParaProduto(categoria))}
+                                            balance={`Disponível: ${restante}`}
+                                            value={quantidades[inputKey] ?? ""}
+                                            onChange={(valor) => {
+                                                setQuantidades((anterior) => ({ ...anterior, [inputKey]: valor }));
+                                                setMensagemErro(null);
+                                                setMensagemSucesso(null);
+                                            }}
+                                            projectionDanger={restante < 0}
+                                        />
+                                    );
+                                })}
+                            </Card>
+                        ))}
+                    </>
+                )}
+                {mensagemErro ? <FeedbackBanner title="Não foi possível registrar" message={mensagemErro} variant="danger" /> : null}
+                {mensagemSucesso ? <FeedbackBanner title="Abastecimento registrado" message={mensagemSucesso} /> : null}
+            </Screen>
+            <BottomActionBar summaryLabel="Total" summaryValue={`${total} pelúcias`} actionLabel={revisando ? "Confirmar abastecimento" : "Revisar abastecimento"} onPress={revisando ? confirmar : revisar} />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-
-    container: {
-        flex: 1,
-        backgroundColor: "#F5F5F5"
-    },
-
-    conteudo: {
-        padding: 20,
-        paddingBottom: 50
-    },
-
-    titulo: {
-        fontSize: 28,
-        fontWeight: "800"
-    },
-
-    local: {
-        fontSize: 18,
-        color: "#666666",
-        marginTop: 4,
-        marginBottom: 24
-    },
-
-    secaoTitulo: {
-        fontSize: 20,
-        fontWeight: "700",
-        marginBottom: 12
-    },
-
-    maquinasTitulo: {
-        marginTop: 26
-    },
-
-    estoqueCategorias: {
-        gap: 10
-    },
-
-    estoqueCategoria: {
-        backgroundColor: "#FFFFFF",
-        borderRadius: 14,
-        padding: 16
-    },
-
-    categoriaNome: {
-        fontSize: 18,
-        fontWeight: "800",
-        marginBottom: 12
-    },
-
-    linhaResumo: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 7
-    },
-
-    resumoLabel: {
-        color: "#666666",
-        fontSize: 13
-    },
-
-    resumoValor: {
-        fontSize: 14,
-        fontWeight: "700"
-    },
-
-    linhaDestaque: {
-        borderTopWidth: 1,
-        borderTopColor: "#EEEEEE",
-        marginTop: 5,
-        paddingTop: 10
-    },
-
-    destaqueLabel: {
-        fontSize: 14,
-        fontWeight: "700"
-    },
-
-    destaqueValor: {
-        fontSize: 20,
-        fontWeight: "800"
-    },
-
-    saldoProjetado: {
-        marginTop: 8,
-        fontSize: 13,
-        fontWeight: "600",
-        color: "#555555"
-    },
-
-    saldoNegativo: {
-        color: "#B00020"
-    },
-
-    maquina: {
-        backgroundColor: "#FFFFFF",
-        padding: 16,
-        borderRadius: 14,
-        marginBottom: 14
-    },
-
-    nomeMaquina: {
-        fontSize: 20,
-        fontWeight: "700",
-        marginBottom: 12
-    },
-
-    linhaProduto: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 12
-    },
-
-    produtoInfo: {
-        flex: 1,
-        paddingRight: 12
-    },
-
-    nomeProduto: {
-        fontSize: 16,
-        fontWeight: "600"
-    },
-
-    produtoDisponivel: {
-        fontSize: 12,
-        color: "#666666",
-        marginTop: 3
-    },
-
-    input: {
-        width: 90,
-        borderWidth: 1,
-        borderColor: "#CCCCCC",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 18,
-        textAlign: "center"
-    },
-
-    sucesso: {
-        backgroundColor: "#E8F5E9",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 16
-    },
-
-    sucessoTitulo: {
-        fontSize: 17,
-        fontWeight: "700"
-    },
-
-    sucessoTexto: {
-        fontSize: 15,
-        marginTop: 4
-    },
-
-    erro: {
-        backgroundColor: "#FFEBEE",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 16
-    },
-
-    erroTitulo: {
-        fontSize: 17,
-        fontWeight: "700"
-    },
-
-    erroTexto: {
-        fontSize: 15,
-        marginTop: 4
-    },
-
-    totalCard: {
-        backgroundColor: "#FFFFFF",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 16
-    },
-
-    totalLabel: {
-        fontSize: 16
-    },
-
-    totalValor: {
-        fontSize: 26,
-        fontWeight: "700",
-        marginTop: 4
-    },
-
-    botao: {
-        backgroundColor: "#111111",
-        padding: 16,
-        borderRadius: 12,
-        alignItems: "center"
-    },
-
-    textoBotao: {
-        color: "#FFFFFF",
-        fontSize: 17,
-        fontWeight: "700"
-    }
+    container: { flex: 1, backgroundColor: Palette.background },
+    content: { paddingTop: Spacing.three, paddingBottom: Spacing.four },
+    contextCard: { flexDirection: "row", alignItems: "center" },
+    contextContent: { flex: 1 },
+    stepLabel: { ...Typography.caption, color: Palette.textSecondary },
+    contextValue: { ...Typography.cardTitle, color: Palette.text, marginTop: Spacing.half },
+    chips: { flexDirection: "row", gap: Spacing.two },
+    responsible: { ...Typography.label, color: Palette.textSecondary, marginTop: Spacing.compact },
+    detailsToggle: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    detailsToggleText: { ...Typography.label, color: Palette.primary, fontWeight: "700" },
+    chevron: { fontSize: 18, color: Palette.primary },
+    pressed: { opacity: 0.65 },
+    balanceCard: { paddingVertical: Spacing.two },
+    balanceBlock: { paddingVertical: Spacing.two },
+    balanceProduct: { ...Typography.label, color: Palette.text, fontWeight: "700" },
+    balanceText: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    usableText: { ...Typography.caption, color: Palette.primary, marginTop: Spacing.half, fontWeight: "700" },
+    machineCard: { paddingVertical: Spacing.two, marginBottom: Spacing.compact },
+    machineName: { ...Typography.cardTitle, color: Palette.text, paddingVertical: Spacing.two },
+    reviewCard: { paddingVertical: Spacing.two },
+    reviewRow: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: Palette.border },
+    reviewProduct: { ...Typography.body, color: Palette.text, fontWeight: "600" },
+    reviewMachine: { ...Typography.caption, color: Palette.textSecondary },
+    reviewQuantity: { ...Typography.cardTitle, color: Palette.primary },
+    editButton: { marginTop: Spacing.compact }
 });
