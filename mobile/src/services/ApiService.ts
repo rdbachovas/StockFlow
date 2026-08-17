@@ -31,7 +31,13 @@ export class ApiService {
     }
 
     private static async erro(resposta: Response): Promise<ErroApi> {
-        let mensagem = `Operação rejeitada pelo servidor (HTTP ${resposta.status}).`;
+        const mensagens: Record<number, string> = {
+            400: "Os dados enviados são inválidos ou a retirada não pode ser realizada.",
+            404: "O estoque, responsável ou produto informado não foi encontrado.",
+            409: "A retirada entrou em conflito com o estado atual do estoque. Atualize e tente novamente."
+        };
+        let mensagem = mensagens[resposta.status] ??
+            `Operação rejeitada pelo servidor (HTTP ${resposta.status}).`;
 
         try {
             const corpo = await resposta.json() as Record<string, unknown>;
@@ -49,9 +55,10 @@ export class ApiService {
 
     static async obterSnapshot(): Promise<SnapshotDto> {
         let resposta: Response;
+        const url = `${this.apiUrl()}/api/v1/snapshot`;
 
         try {
-            resposta = await fetch(`${this.apiUrl()}/api/v1/snapshot`);
+            resposta = await fetch(url);
         } catch {
             throw new ErroApi("Não foi possível conectar ao servidor.");
         }
@@ -68,9 +75,10 @@ export class ApiService {
         retirada: RegistrarRetiradaRequestDto
     ): Promise<RegistrarRetiradaResponseDto> {
         let resposta: Response;
+        const url = `${this.apiUrl()}/api/v1/retiradas`;
 
         try {
-            resposta = await fetch(`${this.apiUrl()}/api/v1/retiradas`, {
+            resposta = await fetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
