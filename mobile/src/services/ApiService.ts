@@ -1,5 +1,9 @@
 import { SnapshotDto } from "../dtos/SnapshotDto";
 import {
+    RegistrarAbastecimentoRequestDto,
+    RegistrarAbastecimentoResponseDto
+} from "../dtos/AbastecimentoDto";
+import {
     RegistrarRetiradaRequestDto,
     RegistrarRetiradaResponseDto
 } from "../dtos/RetiradaDto";
@@ -112,6 +116,15 @@ export class ApiService {
         return await this.post<ReservaResponseDto>(
             `/api/v1/reservas/${encodeURIComponent(reservaId)}/cancelamento`,
             cancelamento
+        );
+    }
+
+    static async registrarAbastecimento(
+        abastecimento: RegistrarAbastecimentoRequestDto
+    ): Promise<RegistrarAbastecimentoResponseDto> {
+        return await this.post<RegistrarAbastecimentoResponseDto>(
+            "/api/v1/abastecimentos",
+            abastecimento
         );
     }
 

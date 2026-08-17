@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.UUID;
 
 import br.com.stockflow.estoque.Estoque;
-import br.com.stockflow.reserva.DestinoReserva;
 import br.com.stockflow.usuario.Usuario;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -37,7 +36,7 @@ public class Abastecimento {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "local_id", length = 50, nullable = false)
-    private DestinoReserva local;
+    private LocalAbastecimento local;
 
     @Column(nullable = false)
     private OffsetDateTime data;
@@ -57,7 +56,7 @@ public class Abastecimento {
     public Abastecimento(
             Usuario responsavel,
             Estoque estoqueOrigem,
-            DestinoReserva local,
+            LocalAbastecimento local,
             OffsetDateTime data,
             String observacao
     ) {
@@ -80,7 +79,7 @@ public class Abastecimento {
     public UUID getId() { return id; }
     public Usuario getResponsavel() { return responsavel; }
     public Estoque getEstoqueOrigem() { return estoqueOrigem; }
-    public DestinoReserva getLocal() { return local; }
+    public LocalAbastecimento getLocal() { return local; }
     public OffsetDateTime getData() { return data; }
     public String getObservacao() { return observacao; }
     public List<AbastecimentoItem> getItens() { return List.copyOf(itens); }

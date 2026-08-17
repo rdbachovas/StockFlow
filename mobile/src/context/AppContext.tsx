@@ -29,7 +29,7 @@ import { Reserva } from "../models/Reserva";
 import { RetiradaEstoque } from "../models/RetiradaEstoque";
 import { UsuarioId } from "../models/Usuario";
 
-import { AbastecimentoService } from "../services/AbastecimentoService";
+import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoService";
 import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
 import { DevolucaoEstoqueService } from "../services/DevolucaoEstoqueService";
 import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
@@ -73,7 +73,7 @@ interface AppContextValue {
     registrarAbastecimento:
         (
             abastecimento: Abastecimento
-        ) => void;
+        ) => Promise<void>;
 
     criarReserva:
         (
@@ -260,65 +260,13 @@ export function AppProvider({
 
     const registrarAbastecimento = (
         abastecimento: Abastecimento
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const rodrigo =
-            clonarEstoque(
-                dadosAtuais.estoqueRodrigo
-            );
-
-        const cesar =
-            clonarEstoque(
-                dadosAtuais.estoqueCesar
-            );
-
-        const reservas =
-            clonarReservas(
-                dadosAtuais.reservas
-            );
-
-        const abastecimentos = [
-            ...dadosAtuais.abastecimentos
-        ];
-
-        const estoque =
-            abastecimento.responsavelId ===
-                UsuarioId.RODRIGO
-                ? rodrigo
-                : abastecimento.responsavelId ===
-                    UsuarioId.CESAR
-                    ? cesar
-                    : undefined;
-
-        if (!estoque) {
-            throw new Error(
-                "Responsável inválido."
-            );
-        }
-
-        AbastecimentoService.registrar(
-            estoque,
-            reservas,
-            abastecimentos,
-            abastecimento
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoqueRodrigo:
-                rodrigo,
-
-            estoqueCesar:
-                cesar,
-
-            reservas,
-
-            abastecimentos
-        };
-        });
+    ): Promise<void> => {
+        return AbastecimentoRemotoService
+            .registrar(abastecimento, estadoSincronizacao)
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const criarReserva = (

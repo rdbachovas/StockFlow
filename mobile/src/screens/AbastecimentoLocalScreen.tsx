@@ -43,7 +43,7 @@ interface Props {
     responsavelId: UsuarioId;
     estoque: Estoque;
     reservas: Reserva[];
-    registrarAbastecimento: (abastecimento: Abastecimento) => void;
+    registrarAbastecimento: (abastecimento: Abastecimento) => Promise<void>;
     onChangeLocal?: () => void;
     onChangeResponsible?: (responsavel: UsuarioId) => void;
 }
@@ -113,7 +113,7 @@ export function AbastecimentoLocalScreen({
         setRevisando(true);
     };
 
-    const confirmar = () => {
+    const confirmar = async () => {
         setMensagemErro(null);
         setMensagemSucesso(null);
         const abastecimento: Abastecimento = {
@@ -124,7 +124,7 @@ export function AbastecimentoLocalScreen({
             data: new Date()
         };
         try {
-            registrarAbastecimento(abastecimento);
+            await registrarAbastecimento(abastecimento);
             setQuantidades({});
             setRevisando(false);
             setMensagemSucesso(`${total} pelúcias registradas com sucesso.`);

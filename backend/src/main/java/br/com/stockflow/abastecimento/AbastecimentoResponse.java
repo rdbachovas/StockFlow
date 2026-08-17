@@ -4,13 +4,12 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import br.com.stockflow.reserva.DestinoReserva;
 
 public record AbastecimentoResponse(
         UUID id,
         String responsavelId,
         String estoqueOrigemId,
-        DestinoReserva local,
+        LocalAbastecimento local,
         List<Item> itens,
         List<Saldo> saldos,
         OffsetDateTime data,

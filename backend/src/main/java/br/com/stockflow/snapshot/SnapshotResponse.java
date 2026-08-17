@@ -183,7 +183,7 @@ public record SnapshotResponse(
             UUID id,
             String responsavelId,
             String estoqueOrigemId,
-            DestinoReserva local,
+            br.com.stockflow.abastecimento.LocalAbastecimento local,
             List<AbastecimentoItemDto> itens,
             List<AbastecimentoSaldoDto> saldos,
             OffsetDateTime data,

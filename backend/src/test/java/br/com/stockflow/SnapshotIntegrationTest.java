@@ -156,6 +156,29 @@ class SnapshotIntegrationTest {
     }
 
     @Test
+    void mercadoMantemLocalFisicoEConsomeDestinoLogico() throws Exception {
+        criarReserva("RODRIGO", "MERCADOS", "MIX", 5);
+        abastecer(
+                "RODRIGO",
+                "SUPERMERCADO_FANTE",
+                "SUPERMERCADO_FANTE",
+                "MIX",
+                2
+        );
+
+        mockMvc.perform(get("/api/v1/snapshot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.abastecimentos[0].local")
+                        .value("SUPERMERCADO_FANTE"))
+                .andExpect(jsonPath("$.reservas[0].destino")
+                        .value("MERCADOS"))
+                .andExpect(jsonPath("$.reservas[0].quantidadeUtilizada")
+                        .value(2))
+                .andExpect(jsonPath("$.reservas[0].quantidadeRestante")
+                        .value(3));
+    }
+
+    @Test
     void retornaDevolucao() throws Exception {
         postJson("/api/v1/devolucoes", """
                 {"responsavelId":"RODRIGO","itens":[
