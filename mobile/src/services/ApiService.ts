@@ -32,9 +32,9 @@ export class ApiService {
 
     private static async erro(resposta: Response): Promise<ErroApi> {
         const mensagens: Record<number, string> = {
-            400: "Os dados enviados são inválidos ou a retirada não pode ser realizada.",
-            404: "O estoque, responsável ou produto informado não foi encontrado.",
-            409: "A retirada entrou em conflito com o estado atual do estoque. Atualize e tente novamente."
+            400: "Os dados enviados são inválidos ou a operação não pode ser realizada.",
+            404: "O recurso informado não foi encontrado.",
+            409: "A operação entrou em conflito com o estado atual. Atualize e tente novamente."
         };
         let mensagem = mensagens[resposta.status] ??
             `Operação rejeitada pelo servidor (HTTP ${resposta.status}).`;

@@ -38,7 +38,7 @@ import {
     EstadoSincronizacao,
     InicializacaoService
 } from "../services/InicializacaoService";
-import { ReservaService } from "../services/ReservaService";
+import { ReservaRemotaService } from "../services/ReservaRemotaService";
 import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
 
 interface AppContextValue {
@@ -324,51 +324,28 @@ export function AppProvider({
     const criarReserva = (
         reserva: Reserva
     ): Promise<void> => {
-        atualizarDados((dadosAtuais) => {
-            const rodrigo = clonarEstoque(dadosAtuais.estoqueRodrigo);
-            const cesar = clonarEstoque(dadosAtuais.estoqueCesar);
-            const reservas = clonarReservas(dadosAtuais.reservas);
-            const estoque = reserva.responsavelId === UsuarioId.RODRIGO
-                ? rodrigo
-                : cesar;
-
-            ReservaService.criarReserva(
-                estoque,
-                reservas,
-                reserva
-            );
-
-            return {
-                ...dadosAtuais,
-                estoqueRodrigo: rodrigo,
-                estoqueCesar: cesar,
-                reservas
-            };
-        });
-
-        return Promise.resolve();
+        return ReservaRemotaService
+            .criar(reserva, estadoSincronizacao)
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const cancelarReserva = (
         reservaId: string,
         responsavelId: string
     ): Promise<void> => {
-        atualizarDados((dadosAtuais) => {
-            const reservas = clonarReservas(dadosAtuais.reservas);
-
-            ReservaService.cancelarReserva(
-                reservas,
+        return ReservaRemotaService
+            .cancelar(
                 reservaId,
-                responsavelId
-            );
-
-            return {
-                ...dadosAtuais,
-                reservas
-            };
-        });
-
-        return Promise.resolve();
+                responsavelId,
+                estadoSincronizacao
+            )
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const registrarDevolucao = (
