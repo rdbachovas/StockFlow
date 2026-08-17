@@ -1,450 +1,115 @@
-import React from "react";
+import React, { useState } from "react";
 
 import {
-    SafeAreaView,
-    ScrollView,
     StyleSheet,
     Text,
     View
 } from "react-native";
 
 import {
-    Abastecimento
-} from "../models/Abastecimento";
-
+    HISTORY_PERIOD_OPTIONS,
+    HistoryFilters,
+    HistoryPeriod,
+    isWithinHistoryPeriod
+} from "../components/history/HistoryFilters";
+import { MovementCard } from "../components/history/MovementCard";
+import { Screen } from "../components/layout/Screen";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
-    LocalId
-} from "../models/Local";
+    Palette,
+    Spacing,
+    Typography
+} from "../constants/theme";
+import { Abastecimento } from "../models/Abastecimento";
+import { LocalId } from "../models/Local";
+import { UsuarioId } from "../models/Usuario";
+import { HistoricoAbastecimentoService } from "../services/HistoricoAbastecimentoService";
+import { nomeProduto } from "../utils/ProdutoUtils";
 
-import {
-    HistoricoAbastecimentoService
-} from "../services/HistoricoAbastecimentoService";
+interface Props { abastecimentos: Abastecimento[]; }
+type LocalFilter = "TODOS" | "PRINCIPAIS" | "MERCADOS";
+type ResponsibleFilter = "TODOS" | UsuarioId;
 
-interface Props {
-    abastecimentos: Abastecimento[];
+function locationName(localId: LocalId): string {
+    const names: Record<LocalId, string> = {
+        [LocalId.BOULEVARD]: "Boulevard",
+        [LocalId.AEROPORTO]: "Aeroporto",
+        [LocalId.MERCADOS]: "Mercados",
+        [LocalId.GAUCHO_VICENTE_FONTOURA]: "Gauchão Vicente da Fontoura",
+        [LocalId.SUPERMAGO_IPIRANGA]: "SuperMago Ipiranga",
+        [LocalId.GAUCHO_ANTONIO_CARVALHO]: "Gauchão Antônio de Carvalho",
+        [LocalId.SUPERMERCADO_FANTE]: "Supermercado Fante",
+        [LocalId.SUPERMAGO_PLANALTO]: "SuperMago Planalto",
+        [LocalId.SAMS_CLUB]: "Sam's Club",
+        [LocalId.SUPERMAGO_BOA_VISTA]: "SuperMago Boa Vista"
+    };
+    return names[localId];
 }
 
-export function HistoricoScreen({
-    abastecimentos
-}: Props) {
+function responsibleName(id: string): string {
+    return id === UsuarioId.RODRIGO ? "Rodrigo" : id === UsuarioId.CESAR ? "Cesar" : id;
+}
 
-    const historico =
-        [...abastecimentos].sort(
-            (a, b) =>
-                b.data.getTime() -
-                a.data.getTime()
-        );
-
-    const nomeLocal = (
-        localId: LocalId
-    ): string => {
-
-        switch (localId) {
-
-            case LocalId.BOULEVARD:
-                return "Boulevard";
-
-            case LocalId.AEROPORTO:
-                return "Aeroporto";
-
-            case LocalId.GAUCHO_VICENTE_FONTOURA:
-                return "Gauchão Vicente da Fontoura";
-
-            case LocalId.SUPERMAGO_IPIRANGA:
-                return "SuperMago Ipiranga";
-
-            case LocalId.GAUCHO_ANTONIO_CARVALHO:
-                return "Gauchão Antônio de Carvalho";
-
-            case LocalId.SUPERMERCADO_FANTE:
-                return "Supermercado Fante";
-
-            case LocalId.SUPERMAGO_PLANALTO:
-                return "SuperMago Planalto";
-
-            case LocalId.SAMS_CLUB:
-                return "Sam's Club";
-
-            case LocalId.SUPERMAGO_BOA_VISTA:
-                return "SuperMago Boa Vista";
-
-            default:
-                return localId;
-        }
-    };
-
-    if (historico.length === 0) {
-
-        return (
-            <SafeAreaView
-                style={styles.container}
-            >
-                <View
-                    style={styles.vazio}
-                >
-
-                    <Text
-                        style={styles.vazioTitulo}
-                    >
-                        Nenhum abastecimento registrado
-                    </Text>
-
-                    <Text
-                        style={styles.vazioTexto}
-                    >
-                        Os abastecimentos aparecerão aqui depois que forem confirmados.
-                    </Text>
-
-                </View>
-            </SafeAreaView>
-        );
-    }
+export function HistoricoScreen({ abastecimentos }: Props) {
+    const [localFilter, setLocalFilter] = useState<LocalFilter>("TODOS");
+    const [responsible, setResponsible] = useState<ResponsibleFilter>("TODOS");
+    const [period, setPeriod] = useState<HistoryPeriod>("TODOS");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const principais = [LocalId.BOULEVARD, LocalId.AEROPORTO];
+    const filtered = [...abastecimentos]
+        .filter((item) => localFilter === "TODOS" || (localFilter === "PRINCIPAIS" ? principais.includes(item.localId) : !principais.includes(item.localId)))
+        .filter((item) => responsible === "TODOS" || item.responsavelId === responsible)
+        .filter((item) => isWithinHistoryPeriod(item.data, period))
+        .sort((a, b) => b.data.getTime() - a.data.getTime());
 
     return (
-        <SafeAreaView
-            style={styles.container}
-        >
+        <Screen>
+            <Text style={styles.subtitle}>Abastecimentos realizados por local e responsável.</Text>
+            <Card style={styles.filters}>
+                <HistoryFilters label="Local" value={localFilter} onChange={setLocalFilter} options={[{ value: "TODOS", label: "Todos" }, { value: "PRINCIPAIS", label: "Boulevard/Aeroporto" }, { value: "MERCADOS", label: "Mercados" }]} />
+                <HistoryFilters label="Responsável" value={responsible} onChange={setResponsible} options={[{ value: "TODOS", label: "Todos" }, { value: UsuarioId.RODRIGO, label: "Rodrigo" }, { value: UsuarioId.CESAR, label: "Cesar" }]} />
+                <HistoryFilters label="Período" value={period} onChange={setPeriod} options={HISTORY_PERIOD_OPTIONS} />
+            </Card>
 
-            <ScrollView
-                contentContainerStyle={
-                    styles.conteudo
-                }
-            >
-
-                <Text
-                    style={styles.titulo}
-                >
-                    Histórico
-                </Text>
-
-                <Text
-                    style={styles.subtitulo}
-                >
-                    Abastecimentos realizados
-                </Text>
-
-                {
-                    historico.map(
-                        (abastecimento) => {
-
-                            const resumoMaquinas =
-                                HistoricoAbastecimentoService
-                                    .resumirPorMaquina(
-                                        abastecimento
-                                    );
-
-                            const total =
-                                HistoricoAbastecimentoService
-                                    .calcularTotal(
-                                        abastecimento
-                                    );
-
-                            return (
-                                <View
-                                    key={
-                                        abastecimento.id
-                                    }
-                                    style={
-                                        styles.card
-                                    }
-                                >
-
-                                    <View
-                                        style={
-                                            styles.cardTopo
-                                        }
-                                    >
-
-                                        <View>
-                                            <Text
-                                                style={
-                                                    styles.local
-                                                }
-                                            >
-                                                {
-                                                    nomeLocal(
-                                                        abastecimento.localId
-                                                    )
-                                                }
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.data
-                                                }
-                                            >
-                                                {
-                                                    abastecimento.data
-                                                        .toLocaleString(
-                                                            "pt-BR"
-                                                        )
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.totalContainer
-                                            }
-                                        >
-
-                                            <Text
-                                                style={
-                                                    styles.totalNumero
-                                                }
-                                            >
-                                                {total}
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.totalTexto
-                                                }
-                                            >
-                                                pelúcias
-                                            </Text>
-
-                                        </View>
-
+            {filtered.length === 0 ? <Card><EmptyState title="Nenhum abastecimento encontrado" description="Tente ampliar os filtros selecionados." /></Card> : filtered.map((supply) => {
+                const machines = HistoricoAbastecimentoService.resumirPorMaquina(supply);
+                const total = HistoricoAbastecimentoService.calcularTotal(supply);
+                const expanded = expandedId === supply.id;
+                return (
+                    <MovementCard key={supply.id} type="Abastecimento" context={`${locationName(supply.localId)} · ${responsibleName(supply.responsavelId)}`} summary={`${total} pelúcias em ${machines.length} ${machines.length === 1 ? "máquina" : "máquinas"}`} date={supply.data} expanded={expanded} onToggle={() => setExpandedId(expanded ? null : supply.id)}>
+                        {machines.map((machine) => (
+                            <View key={machine.maquinaId} style={styles.machine}>
+                                <Text style={styles.machineName}>{machine.maquinaId}</Text>
+                                {machine.itens.map((item, index) => (
+                                    <View key={`${item.maquinaId}-${item.produtoId}-${index}`} style={styles.itemRow}>
+                                        <Text style={styles.itemName}>{nomeProduto(item.produtoId)}</Text><Text style={styles.itemQuantity}>{item.quantidade}</Text>
                                     </View>
-
-                                    <View
-                                        style={
-                                            styles.divisor
-                                        }
-                                    />
-
-                                    {
-                                        resumoMaquinas.map(
-                                            (maquina) => (
-
-                                                <View
-                                                    key={
-                                                        maquina.maquinaId
-                                                    }
-                                                    style={
-                                                        styles.maquina
-                                                    }
-                                                >
-
-                                                    <Text
-                                                        style={
-                                                            styles.maquinaNome
-                                                        }
-                                                    >
-                                                        {
-                                                            maquina.maquinaId
-                                                        }
-                                                    </Text>
-
-                                                    <View
-                                                        style={
-                                                            styles.itens
-                                                        }
-                                                    >
-
-                                                        {
-                                                            maquina.itens.map(
-                                                                (
-                                                                    item,
-                                                                    index
-                                                                ) => (
-
-                                                                    <Text
-                                                                        key={
-                                                                            `${item.maquinaId}-${item.produtoId}-${index}`
-                                                                        }
-                                                                        style={
-                                                                            styles.itemTexto
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            item.produtoId
-                                                                        }: {
-                                                                            item.quantidade
-                                                                        }
-                                                                    </Text>
-
-                                                                )
-                                                            )
-                                                        }
-
-                                                    </View>
-
-                                                </View>
-
-                                            )
-                                        )
-                                    }
-
-                                    <View
-                                        style={
-                                            styles.rodape
-                                        }
-                                    >
-
-                                        <Text
-                                            style={
-                                                styles.responsavel
-                                            }
-                                        >
-                                            Responsável: {
-                                                abastecimento.responsavelId
-                                            }
-                                        </Text>
-
-                                        {
-                                            abastecimento.observacao
-                                                ? (
-                                                    <Text
-                                                        style={
-                                                            styles.observacao
-                                                        }
-                                                    >
-                                                        {
-                                                            abastecimento.observacao
-                                                        }
-                                                    </Text>
-                                                )
-                                                : null
-                                        }
-
-                                    </View>
-
-                                </View>
-                            );
-                        }
-                    )
-                }
-
-            </ScrollView>
-
-        </SafeAreaView>
+                                ))}
+                            </View>
+                        ))}
+                        {supply.saldos?.map((saldo) => (
+                            <View key={saldo.produtoId} style={styles.balanceRow}>
+                                <Text style={styles.itemName}>{nomeProduto(saldo.produtoId)}</Text><Text style={styles.balance}>{saldo.saldoAnterior} → {saldo.saldoPosterior}</Text>
+                            </View>
+                        ))}
+                        {supply.observacao ? <Text style={styles.note}>Observação: {supply.observacao}</Text> : null}
+                    </MovementCard>
+                );
+            })}
+        </Screen>
     );
 }
 
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            backgroundColor: "#F5F5F5"
-        },
-
-        conteudo: {
-            padding: 20,
-            paddingBottom: 50
-        },
-
-        titulo: {
-            fontSize: 30,
-            fontWeight: "800"
-        },
-
-        subtitulo: {
-            fontSize: 16,
-            color: "#666666",
-            marginTop: 4,
-            marginBottom: 24
-        },
-
-        card: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 16,
-            padding: 18,
-            marginBottom: 16
-        },
-
-        cardTopo: {
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between"
-        },
-
-        local: {
-            fontSize: 20,
-            fontWeight: "700"
-        },
-
-        data: {
-            fontSize: 14,
-            color: "#666666",
-            marginTop: 4
-        },
-
-        totalContainer: {
-            alignItems: "center"
-        },
-
-        totalNumero: {
-            fontSize: 24,
-            fontWeight: "800"
-        },
-
-        totalTexto: {
-            fontSize: 12,
-            color: "#666666"
-        },
-
-        divisor: {
-            height: 1,
-            backgroundColor: "#E5E5E5",
-            marginVertical: 16
-        },
-
-        maquina: {
-            marginBottom: 14
-        },
-
-        maquinaNome: {
-            fontSize: 17,
-            fontWeight: "700",
-            marginBottom: 4
-        },
-
-        itens: {
-            paddingLeft: 8
-        },
-
-        itemTexto: {
-            fontSize: 15,
-            marginBottom: 3
-        },
-
-        rodape: {
-            borderTopWidth: 1,
-            borderTopColor: "#E5E5E5",
-            paddingTop: 12,
-            marginTop: 4
-        },
-
-        responsavel: {
-            fontSize: 13,
-            color: "#666666"
-        },
-
-        observacao: {
-            fontSize: 14,
-            marginTop: 6
-        },
-
-        vazio: {
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 30
-        },
-
-        vazioTitulo: {
-            fontSize: 20,
-            fontWeight: "700",
-            textAlign: "center"
-        },
-
-        vazioTexto: {
-            fontSize: 15,
-            color: "#666666",
-            textAlign: "center",
-            marginTop: 8
-        }
-    });
+const styles = StyleSheet.create({
+    subtitle: { ...Typography.body, color: Palette.textSecondary, marginBottom: Spacing.three },
+    filters: { paddingBottom: Spacing.one, marginBottom: Spacing.three },
+    machine: { marginBottom: Spacing.compact },
+    machineName: { ...Typography.label, color: Palette.text, fontWeight: "700", marginBottom: Spacing.one },
+    itemRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: Spacing.one },
+    itemName: { ...Typography.label, color: Palette.textSecondary },
+    itemQuantity: { ...Typography.label, color: Palette.text, fontWeight: "700" },
+    balanceRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: Palette.border, paddingVertical: Spacing.two },
+    balance: { ...Typography.label, color: Palette.primary, fontWeight: "700" },
+    note: { ...Typography.label, color: Palette.text, marginTop: Spacing.two }
+});

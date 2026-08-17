@@ -4,798 +4,99 @@ import React, {
 } from "react";
 
 import {
-    ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from "react-native";
 
 import {
-    DestinoReservaId
-} from "../models/DestinoReserva";
-
+    HISTORY_PERIOD_OPTIONS,
+    HistoryFilters,
+    HistoryPeriod,
+    isWithinHistoryPeriod
+} from "../components/history/HistoryFilters";
+import { HistoryTimeline } from "../components/history/HistoryTimeline";
+import { MovementCard } from "../components/history/MovementCard";
+import { Screen } from "../components/layout/Screen";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
+import {
+    Palette,
+    Spacing,
+    Typography
+} from "../constants/theme";
+import { DestinoReservaId } from "../models/DestinoReserva";
 import {
     Reserva,
     StatusReserva,
     TipoEventoReserva
 } from "../models/Reserva";
+import { UsuarioId } from "../models/Usuario";
+import { ReservaService } from "../services/ReservaService";
+import { nomeProduto } from "../utils/ProdutoUtils";
 
-import {
-    UsuarioId
-} from "../models/Usuario";
+interface Props { reservas: Reserva[]; }
+type EventFilter = "TODOS" | TipoEventoReserva;
+type ResponsibleFilter = "TODOS" | UsuarioId;
+interface ReservationEvent { id: string; reservation: Reserva; type: TipoEventoReserva; quantity: number; date: Date; observation?: string; }
 
-import {
-    ReservaService
-} from "../services/ReservaService";
+function responsibleName(id: string): string { return id === UsuarioId.RODRIGO ? "Rodrigo" : id === UsuarioId.CESAR ? "Cesar" : id; }
+function destinationName(id: DestinoReservaId): string { return id === DestinoReservaId.BOULEVARD ? "Boulevard" : id === DestinoReservaId.AEROPORTO ? "Aeroporto" : id === DestinoReservaId.MERCADOS ? "Mercados" : "SuperMago Boa Vista"; }
+function eventName(type: TipoEventoReserva): string { return type === TipoEventoReserva.CRIACAO ? "Criação" : type === TipoEventoReserva.UTILIZACAO ? "Utilização" : type === TipoEventoReserva.LIBERACAO ? "Liberação" : type === TipoEventoReserva.CANCELAMENTO ? "Cancelamento" : "Conclusão"; }
+function statusName(status: StatusReserva): string { return status === StatusReserva.ATIVA ? "Ativa" : status === StatusReserva.CANCELADA ? "Cancelada" : "Concluída"; }
+function eventQuantity(type: TipoEventoReserva, quantity: number): string { return type === TipoEventoReserva.CRIACAO ? `+${quantity}` : type === TipoEventoReserva.CONCLUSAO ? "✓" : `-${quantity}`; }
 
-import {
-    nomeProduto
-} from "../utils/ProdutoUtils";
-
-interface Props {
-    reservas: Reserva[];
-}
-
-interface EventoHistorico {
-    id: string;
-
-    reserva: Reserva;
-
-    tipo: TipoEventoReserva;
-
-    quantidade: number;
-
-    data: Date;
-
-    observacao?: string;
-}
-
-function nomeResponsavel(
-    id: string
-): string {
-
-    return id ===
-        UsuarioId.RODRIGO
-        ? "Rodrigo"
-        : id ===
-            UsuarioId.CESAR
-            ? "Cesar"
-            : id;
-}
-
-function nomeDestino(
-    destino: DestinoReservaId
-): string {
-
-    switch (destino) {
-
-        case DestinoReservaId.BOULEVARD:
-            return "Boulevard";
-
-        case DestinoReservaId.AEROPORTO:
-            return "Aeroporto";
-
-        case DestinoReservaId.MERCADOS:
-            return "Mercados";
-
-        case DestinoReservaId.SUPERMAGO_BOA_VISTA:
-            return "SuperMago Boa Vista";
-
-        default:
-            return String(destino);
-    }
-}
-
-function nomeEvento(
-    tipo: TipoEventoReserva
-): string {
-
-    switch (tipo) {
-
-        case TipoEventoReserva.CRIACAO:
-            return "Reserva criada";
-
-        case TipoEventoReserva.UTILIZACAO:
-            return "Utilizada em abastecimento";
-
-        case TipoEventoReserva.LIBERACAO:
-            return "Quantidade liberada";
-
-        case TipoEventoReserva.CANCELAMENTO:
-            return "Reserva cancelada";
-
-        case TipoEventoReserva.CONCLUSAO:
-            return "Reserva concluída";
-    }
-}
-
-function textoStatus(
-    status: StatusReserva
-): string {
-
-    switch (status) {
-
-        case StatusReserva.ATIVA:
-            return "Ativa";
-
-        case StatusReserva.CANCELADA:
-            return "Cancelada";
-
-        case StatusReserva.CONCLUIDA:
-            return "Concluída";
-    }
-}
-
-export function HistoricoReservasScreen({
-    reservas
-}: Props) {
-
-    const [
-        responsavel,
-        setResponsavel
-    ] = useState<
-        UsuarioId | "TODOS"
-    >("TODOS");
-
-    const eventos =
-        useMemo(
-            () => {
-
-                const lista:
-                    EventoHistorico[] = [];
-
-                for (
-                    const reserva
-                    of reservas
-                ) {
-
-                    for (
-                        const evento
-                        of reserva.historico ??
-                        []
-                    ) {
-
-                        lista.push({
-
-                            id:
-                                `${reserva.id}_${evento.id}`,
-
-                            reserva,
-
-                            tipo:
-                                evento.tipo,
-
-                            quantidade:
-                                evento.quantidade,
-
-                            data:
-                                evento.data,
-
-                            observacao:
-                                evento.observacao
-                        });
-                    }
-                }
-
-                return lista.sort(
-                    (a, b) =>
-                        new Date(
-                            b.data
-                        ).getTime() -
-                        new Date(
-                            a.data
-                        ).getTime()
-                );
-            },
-            [reservas]
-        );
-
-    const filtrados =
-        useMemo(
-            () => {
-
-                if (
-                    responsavel ===
-                    "TODOS"
-                ) {
-                    return eventos;
-                }
-
-                return eventos.filter(
-                    (evento) =>
-                        evento.reserva.responsavelId ===
-                        responsavel
-                );
-            },
-            [
-                eventos,
-                responsavel
-            ]
-        );
-
-    function quantidadeEvento(
-        evento: EventoHistorico
-    ): string {
-
-        switch (evento.tipo) {
-
-            case TipoEventoReserva.CRIACAO:
-
-                return `+${evento.quantidade}`;
-
-            case TipoEventoReserva.UTILIZACAO:
-            case TipoEventoReserva.LIBERACAO:
-            case TipoEventoReserva.CANCELAMENTO:
-
-                return `-${evento.quantidade}`;
-
-            case TipoEventoReserva.CONCLUSAO:
-
-                return "✓";
-        }
-    }
+export function HistoricoReservasScreen({ reservas }: Props) {
+    const [type, setType] = useState<EventFilter>("TODOS");
+    const [responsible, setResponsible] = useState<ResponsibleFilter>("TODOS");
+    const [period, setPeriod] = useState<HistoryPeriod>("TODOS");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const events = useMemo<ReservationEvent[]>(() => reservas.flatMap((reservation) =>
+        (reservation.historico ?? []).map((event) => ({ id: `${reservation.id}_${event.id}`, reservation, type: event.tipo, quantity: event.quantidade, date: event.data, observation: event.observacao }))
+    ).sort((a, b) => b.date.getTime() - a.date.getTime()), [reservas]);
+    const filtered = events.filter((event) => type === "TODOS" || event.type === type).filter((event) => responsible === "TODOS" || event.reservation.responsavelId === responsible).filter((event) => isWithinHistoryPeriod(event.date, period));
 
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={
-                styles.conteudo
-            }
-        >
-
-            <Text
-                style={styles.titulo}
-            >
-                Histórico de Reservas
-            </Text>
-
-            <Text
-                style={styles.subtitulo}
-            >
-                Veja como cada reserva foi criada, utilizada, liberada ou encerrada
-            </Text>
-
-            <View
-                style={styles.filtros}
-            >
-
-                {
-                    [
-                        ["TODOS", "Todos"],
-                        [
-                            UsuarioId.RODRIGO,
-                            "Rodrigo"
-                        ],
-                        [
-                            UsuarioId.CESAR,
-                            "Cesar"
-                        ]
-                    ].map(
-                        ([valor, nome]) => (
-
-                            <TouchableOpacity
-                                key={
-                                    valor
-                                }
-
-                                style={[
-                                    styles.filtro,
-
-                                    responsavel ===
-                                        valor &&
-                                    styles.filtroAtivo
-                                ]}
-
-                                onPress={
-                                    () =>
-                                        setResponsavel(
-                                            valor as
-                                                UsuarioId |
-                                                "TODOS"
-                                        )
-                                }
-                            >
-
-                                <Text
-                                    style={[
-                                        styles.filtroTexto,
-
-                                        responsavel ===
-                                            valor &&
-                                        styles.filtroTextoAtivo
-                                    ]}
-                                >
-                                    {nome}
-                                </Text>
-
-                            </TouchableOpacity>
-                        )
-                    )
-                }
-
-            </View>
-
-            {
-                filtrados.length ===
-                0
-                    ? (
-                        <View
-                            style={styles.vazio}
-                        >
-                            <Text
-                                style={styles.vazioTitulo}
-                            >
-                                Nenhum evento de reserva
-                            </Text>
-
-                            <Text
-                                style={styles.vazioTexto}
-                            >
-                                As próximas reservas aparecerão aqui.
-                            </Text>
+        <Screen>
+            <Text style={styles.subtitle}>Ciclo completo de criação, uso e encerramento das reservas.</Text>
+            <Card style={styles.filters}>
+                <HistoryFilters label="Evento" value={type} onChange={setType} options={[{ value: "TODOS", label: "Todos" }, { value: TipoEventoReserva.CRIACAO, label: "Criação" }, { value: TipoEventoReserva.UTILIZACAO, label: "Utilização" }, { value: TipoEventoReserva.LIBERACAO, label: "Liberação" }, { value: TipoEventoReserva.CANCELAMENTO, label: "Cancelamento" }, { value: TipoEventoReserva.CONCLUSAO, label: "Conclusão" }]} />
+                <HistoryFilters label="Responsável" value={responsible} onChange={setResponsible} options={[{ value: "TODOS", label: "Todos" }, { value: UsuarioId.RODRIGO, label: "Rodrigo" }, { value: UsuarioId.CESAR, label: "Cesar" }]} />
+                <HistoryFilters label="Período" value={period} onChange={setPeriod} options={HISTORY_PERIOD_OPTIONS} />
+            </Card>
+            {filtered.length === 0 ? <Card><EmptyState title="Nenhum evento de reserva encontrado" description="Tente ampliar os filtros selecionados." /></Card> : filtered.map((event) => {
+                const reservation = event.reservation;
+                const expanded = expandedId === event.id;
+                const remaining = ReservaService.quantidadeRestante(reservation);
+                const timeline = [...(reservation.historico ?? [])].sort((a, b) => a.data.getTime() - b.data.getTime()).map((item) => ({ id: item.id, title: eventName(item.tipo), quantity: eventQuantity(item.tipo, item.quantidade), date: item.data, note: item.observacao }));
+                return (
+                    <MovementCard key={event.id} type={eventName(event.type)} context={`${responsibleName(reservation.responsavelId)} · ${destinationName(reservation.destinoId)}`} summary={`${nomeProduto(reservation.produtoId)} · ${eventQuantity(event.type, event.quantity)}`} date={event.date} expanded={expanded} onToggle={() => setExpandedId(expanded ? null : event.id)}>
+                        <View style={styles.stats}>
+                            <View style={styles.stat}><Text style={styles.statValue}>{reservation.quantidade}</Text><Text style={styles.statLabel}>Original</Text></View>
+                            <View style={styles.stat}><Text style={styles.statValue}>{reservation.quantidadeUtilizada}</Text><Text style={styles.statLabel}>Utilizada</Text></View>
+                            <View style={styles.stat}><Text style={styles.statValue}>{reservation.quantidadeLiberada ?? 0}</Text><Text style={styles.statLabel}>Liberada</Text></View>
+                            <View style={styles.stat}><Text style={styles.statValue}>{remaining}</Text><Text style={styles.statLabel}>Restante</Text></View>
                         </View>
-                    )
-                    : filtrados.map(
-                        (evento) => {
-
-                            const reserva =
-                                evento.reserva;
-
-                            const restante =
-                                ReservaService
-                                    .quantidadeRestante(
-                                        reserva
-                                    );
-
-                            return (
-                                <View
-                                    key={
-                                        evento.id
-                                    }
-                                    style={
-                                        styles.card
-                                    }
-                                >
-
-                                    <View
-                                        style={
-                                            styles.topo
-                                        }
-                                    >
-
-                                        <View
-                                            style={
-                                                styles.topoInfo
-                                            }
-                                        >
-
-                                            <Text
-                                                style={
-                                                    styles.evento
-                                                }
-                                            >
-                                                {
-                                                    nomeEvento(
-                                                        evento.tipo
-                                                    )
-                                                }
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.produto
-                                                }
-                                            >
-                                                {
-                                                    nomeProduto(
-                                                        reserva.produtoId
-                                                    )
-                                                }
-                                            </Text>
-
-                                        </View>
-
-                                        <Text
-                                            style={
-                                                styles.quantidade
-                                            }
-                                        >
-                                            {
-                                                quantidadeEvento(
-                                                    evento
-                                                )
-                                            }
-                                        </Text>
-
-                                    </View>
-
-                                    <View
-                                        style={
-                                            styles.destinoBox
-                                        }
-                                    >
-
-                                        <View
-                                            style={
-                                                styles.linha
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.label
-                                                }
-                                            >
-                                                Responsável
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.valor
-                                                }
-                                            >
-                                                {
-                                                    nomeResponsavel(
-                                                        reserva.responsavelId
-                                                    )
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.linha
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.label
-                                                }
-                                            >
-                                                Destino
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.valor
-                                                }
-                                            >
-                                                {
-                                                    nomeDestino(
-                                                        reserva.destinoId
-                                                    )
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.linha
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.label
-                                                }
-                                            >
-                                                Status atual
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.valor
-                                                }
-                                            >
-                                                {
-                                                    textoStatus(
-                                                        reserva.status
-                                                    )
-                                                }
-                                            </Text>
-                                        </View>
-
-                                    </View>
-
-                                    <View
-                                        style={
-                                            styles.resumo
-                                        }
-                                    >
-
-                                        <View
-                                            style={
-                                                styles.resumoColuna
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.resumoLabel
-                                                }
-                                            >
-                                                Original
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.resumoValor
-                                                }
-                                            >
-                                                {
-                                                    reserva.quantidade
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.resumoColuna
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.resumoLabel
-                                                }
-                                            >
-                                                Utilizado
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.resumoValor
-                                                }
-                                            >
-                                                {
-                                                    reserva.quantidadeUtilizada
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.resumoColuna
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.resumoLabel
-                                                }
-                                            >
-                                                Liberado
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.resumoValor
-                                                }
-                                            >
-                                                {
-                                                    reserva.quantidadeLiberada ??
-                                                    0
-                                                }
-                                            </Text>
-                                        </View>
-
-                                        <View
-                                            style={
-                                                styles.resumoColuna
-                                            }
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.resumoLabel
-                                                }
-                                            >
-                                                Restante
-                                            </Text>
-
-                                            <Text
-                                                style={
-                                                    styles.resumoValor
-                                                }
-                                            >
-                                                {
-                                                    restante
-                                                }
-                                            </Text>
-                                        </View>
-
-                                    </View>
-
-                                    <Text
-                                        style={
-                                            styles.data
-                                        }
-                                    >
-                                        {
-                                            new Date(
-                                                evento.data
-                                            ).toLocaleString(
-                                                "pt-BR"
-                                            )
-                                        }
-                                    </Text>
-
-                                    {
-                                        evento.observacao
-                                            ? (
-                                                <Text
-                                                    style={
-                                                        styles.observacao
-                                                    }
-                                                >
-                                                    {
-                                                        evento.observacao
-                                                    }
-                                                </Text>
-                                            )
-                                            : null
-                                    }
-
-                                </View>
-                            );
-                        }
-                    )
-            }
-
-        </ScrollView>
+                        <View style={styles.statusRow}><Text style={styles.statusLabel}>Status atual</Text><Text style={[styles.status, reservation.status === StatusReserva.ATIVA && styles.active]}>{statusName(reservation.status)}</Text></View>
+                        <Text style={styles.timelineTitle}>Eventos relacionados</Text>
+                        <HistoryTimeline events={timeline} />
+                    </MovementCard>
+                );
+            })}
+        </Screen>
     );
 }
 
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            backgroundColor: "#F5F5F5"
-        },
-
-        conteudo: {
-            padding: 20,
-            paddingBottom: 60
-        },
-
-        titulo: {
-            fontSize: 28,
-            fontWeight: "800"
-        },
-
-        subtitulo: {
-            color: "#666666",
-            marginTop: 4,
-            marginBottom: 20
-        },
-
-        filtros: {
-            flexDirection: "row",
-            gap: 8,
-            marginBottom: 22
-        },
-
-        filtro: {
-            flex: 1,
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#DDDDDD",
-            borderRadius: 10,
-            padding: 10,
-            alignItems: "center"
-        },
-
-        filtroAtivo: {
-            backgroundColor: "#111111",
-            borderColor: "#111111"
-        },
-
-        filtroTexto: {
-            fontWeight: "700"
-        },
-
-        filtroTextoAtivo: {
-            color: "#FFFFFF"
-        },
-
-        card: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 12
-        },
-
-        topo: {
-            flexDirection: "row",
-            justifyContent: "space-between"
-        },
-
-        topoInfo: {
-            flex: 1
-        },
-
-        evento: {
-            color: "#666666",
-            fontSize: 12,
-            fontWeight: "800"
-        },
-
-        produto: {
-            fontSize: 19,
-            fontWeight: "800",
-            marginTop: 3
-        },
-
-        quantidade: {
-            fontSize: 24,
-            fontWeight: "800"
-        },
-
-        destinoBox: {
-            borderTopWidth: 1,
-            borderTopColor: "#EEEEEE",
-            marginTop: 12,
-            paddingTop: 10
-        },
-
-        linha: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 5
-        },
-
-        label: {
-            color: "#777777"
-        },
-
-        valor: {
-            fontWeight: "600"
-        },
-
-        resumo: {
-            backgroundColor: "#F7F7F7",
-            borderRadius: 10,
-            padding: 10,
-            marginTop: 10,
-            flexDirection: "row"
-        },
-
-        resumoColuna: {
-            flex: 1
-        },
-
-        resumoLabel: {
-            color: "#777777",
-            fontSize: 10
-        },
-
-        resumoValor: {
-            fontWeight: "800",
-            fontSize: 17,
-            marginTop: 2
-        },
-
-        data: {
-            color: "#777777",
-            fontSize: 12,
-            marginTop: 10
-        },
-
-        observacao: {
-            fontSize: 12,
-            marginTop: 4
-        },
-
-        vazio: {
-            backgroundColor: "#FFFFFF",
-            padding: 20,
-            borderRadius: 14
-        },
-
-        vazioTitulo: {
-            fontWeight: "700",
-            textAlign: "center"
-        },
-
-        vazioTexto: {
-            color: "#666666",
-            textAlign: "center",
-            marginTop: 4
-        }
-    });
+const styles = StyleSheet.create({
+    subtitle: { ...Typography.body, color: Palette.textSecondary, marginBottom: Spacing.three },
+    filters: { paddingBottom: Spacing.one, marginBottom: Spacing.three },
+    stats: { flexDirection: "row", backgroundColor: Palette.background, borderRadius: 10, paddingVertical: Spacing.compact },
+    stat: { flex: 1, alignItems: "center" },
+    statValue: { ...Typography.cardTitle, color: Palette.text },
+    statLabel: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    statusRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: Spacing.compact, borderBottomWidth: 1, borderBottomColor: Palette.border },
+    statusLabel: { ...Typography.label, color: Palette.textSecondary },
+    status: { ...Typography.label, color: Palette.text, fontWeight: "700" },
+    active: { color: Palette.success },
+    timelineTitle: { ...Typography.label, color: Palette.text, fontWeight: "700", marginTop: Spacing.compact }
+});
