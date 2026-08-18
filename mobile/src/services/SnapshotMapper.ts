@@ -45,6 +45,65 @@ function validar(snapshot: unknown): asserts snapshot is SnapshotDto {
     }
 }
 
+function inteiroNaoNegativo(valor: number): boolean {
+    return Number.isInteger(valor) && valor >= 0;
+}
+
+function validarDadosMapeados(dados: DadosIniciais): void {
+    const estoquesValidos = [
+        dados.estoquePrincipal,
+        dados.estoqueRodrigo,
+        dados.estoqueCesar
+    ].every((estoque) =>
+        estoque.itens.every((item) => inteiroNaoNegativo(item.quantidade))
+    );
+    const reservasValidas = dados.reservas.every((reserva) =>
+        inteiroNaoNegativo(reserva.quantidade) &&
+        inteiroNaoNegativo(reserva.quantidadeUtilizada) &&
+        inteiroNaoNegativo(reserva.quantidadeLiberada ?? 0) &&
+        reserva.quantidadeUtilizada + (reserva.quantidadeLiberada ?? 0) <= reserva.quantidade &&
+        reserva.historico?.every((evento) => inteiroNaoNegativo(evento.quantidade)) !== false
+    );
+    const retiradasValidas = dados.retiradas.every((registro) =>
+        registro.itens.every((item) => Number.isInteger(item.quantidade) && item.quantidade > 0)
+    );
+    const abastecimentosValidos = dados.abastecimentos.every((registro) =>
+        registro.itens.every((item) => Number.isInteger(item.quantidade) && item.quantidade > 0) &&
+        registro.saldos?.every((item) =>
+            Number.isInteger(item.quantidade) && item.quantidade > 0 &&
+            inteiroNaoNegativo(item.saldoAnterior) &&
+            inteiroNaoNegativo(item.saldoPosterior)
+        ) !== false
+    );
+    const devolucoesValidas = dados.devolucoes.every((registro) =>
+        registro.itens.every((item) =>
+            inteiroNaoNegativo(item.quantidadeLivre) &&
+            item.reservas.every((reserva) => Number.isInteger(reserva.quantidade) && reserva.quantidade > 0)
+        )
+    );
+    const movimentosValidos = [
+        ...dados.movimentosEstoquePrincipal,
+        ...dados.consumosCarrinho
+    ].every((registro) =>
+        registro.itens.every((item) =>
+            Number.isInteger(item.quantidade) && item.quantidade > 0 &&
+            inteiroNaoNegativo(item.saldoAnterior) &&
+            inteiroNaoNegativo(item.saldoPosterior)
+        )
+    );
+
+    if (
+        !estoquesValidos ||
+        !reservasValidas ||
+        !retiradasValidas ||
+        !abastecimentosValidos ||
+        !devolucoesValidas ||
+        !movimentosValidos
+    ) {
+        throw new Error("Snapshot contém quantidades ou saldos inválidos.");
+    }
+}
+
 export class SnapshotMapper {
     static paraDadosIniciais(valor: unknown): DadosIniciais {
         validar(valor);
@@ -67,7 +126,7 @@ export class SnapshotMapper {
             }))
         });
 
-        return {
+        const dados: DadosIniciais = {
             estoquePrincipal: mapearEstoque(estoquePrincipal),
             estoqueRodrigo: mapearEstoque(estoqueRodrigo),
             estoqueCesar: mapearEstoque(estoqueCesar),
@@ -148,5 +207,9 @@ export class SnapshotMapper {
                 observacao: consumo.observacao ?? undefined
             }))
         };
+
+        validarDadosMapeados(dados);
+
+        return dados;
     }
 }

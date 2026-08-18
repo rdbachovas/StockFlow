@@ -1,45 +1,34 @@
-import React, {
-    useState
-} from "react";
+import React, { useState } from "react";
 
 import {
-    SafeAreaView,
-    ScrollView,
+    Pressable,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from "react-native";
 
-import {
-    Link
-} from "expo-router";
+import { useRouter } from "expo-router";
 
+import { Screen } from "../components/layout/Screen";
+import { Section } from "../components/layout/Section";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Chip } from "../components/ui/Chip";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
-    DestinoReservaId
-} from "../models/DestinoReserva";
-
-import {
-    Estoque
-} from "../models/Estoque";
-
-import {
-    ProdutoId
-} from "../models/Produto";
-
+    Palette,
+    Spacing,
+    Typography
+} from "../constants/theme";
+import { DestinoReservaId } from "../models/DestinoReserva";
+import { Estoque } from "../models/Estoque";
+import { ProdutoId } from "../models/Produto";
 import {
     Reserva,
     StatusReserva
 } from "../models/Reserva";
-
-import {
-    UsuarioId
-} from "../models/Usuario";
-
-import {
-    ReservaService
-} from "../services/ReservaService";
-
+import { UsuarioId } from "../models/Usuario";
+import { ReservaService } from "../services/ReservaService";
 import {
     nomeProduto,
     PRODUTOS_CARRINHO,
@@ -50,23 +39,17 @@ interface Props {
     estoqueRodrigo: Estoque;
     estoqueCesar: Estoque;
     reservas: Reserva[];
+    responsavelInicial?: UsuarioId;
 }
 
-function nomeDestino(
-    destinoId: DestinoReservaId
-): string {
-
-    switch (destinoId) {
-
+function destinationName(destinationId: DestinoReservaId): string {
+    switch (destinationId) {
         case DestinoReservaId.BOULEVARD:
             return "Boulevard";
-
         case DestinoReservaId.AEROPORTO:
             return "Aeroporto";
-
         case DestinoReservaId.MERCADOS:
             return "Mercados";
-
         case DestinoReservaId.SUPERMAGO_BOA_VISTA:
             return "SuperMago Boa Vista";
     }
@@ -75,755 +58,190 @@ function nomeDestino(
 export function EstoquePessoalScreen({
     estoqueRodrigo,
     estoqueCesar,
-    reservas
+    reservas,
+    responsavelInicial = UsuarioId.RODRIGO
 }: Props) {
+    const router = useRouter();
+    const [responsible, setResponsible] = useState<UsuarioId>(responsavelInicial);
+    const [expandedProduct, setExpandedProduct] = useState<ProdutoId | null>(null);
 
-    const [
-        pessoa,
-        setPessoa
-    ] = useState<UsuarioId>(
-        UsuarioId.RODRIGO
-    );
+    const stock = responsible === UsuarioId.RODRIGO ? estoqueRodrigo : estoqueCesar;
+    const allProducts = [...PRODUTOS_PELUCIAS, ...PRODUTOS_CARRINHO];
+    const quantity = (productId: ProdutoId) =>
+        stock.itens.find((item) => item.produtoId === productId)?.quantidade ?? 0;
+    const reserved = (productId: ProdutoId) =>
+        ReservaService.quantidadeReservada(reservas, productId, responsible);
+    const free = (productId: ProdutoId) =>
+        PRODUTOS_CARRINHO.includes(productId)
+            ? quantity(productId)
+            : ReservaService.quantidadeDisponivel(stock, reservas, productId);
 
-    const estoque =
-        pessoa ===
-            UsuarioId.RODRIGO
-            ? estoqueRodrigo
-            : estoqueCesar;
+    const physicalTotal = allProducts.reduce((total, productId) => total + quantity(productId), 0);
+    const reservedTotal = PRODUTOS_PELUCIAS.reduce((total, productId) => total + reserved(productId), 0);
+    const freeTotal = allProducts.reduce((total, productId) => total + free(productId), 0);
 
-    const quantidade = (
-        produtoId: ProdutoId
-    ): number => {
-
-        return (
-            estoque.itens.find(
-                (item) =>
-                    item.produtoId ===
-                    produtoId
-            )?.quantidade ?? 0
-        );
+    const changeResponsible = (person: UsuarioId) => {
+        setResponsible(person);
+        setExpandedProduct(null);
     };
 
-    const renderPelucias = () => {
-
-        const produtos =
-            PRODUTOS_PELUCIAS.filter(
-                (produtoId) =>
-                    quantidade(
-                        produtoId
-                    ) > 0
-            );
+    const renderGroup = (title: string, products: ProdutoId[], isCart: boolean) => {
+        const availableProducts = products.filter((productId) => quantity(productId) > 0);
 
         return (
-            <View
-                style={styles.grupo}
+            <Section
+                title={title}
+                description={isCart ? "Insumos sob responsabilidade pessoal" : "Produtos usados nos abastecimentos"}
             >
+                {availableProducts.length === 0 ? (
+                    <Card>
+                        <EmptyState title={`Nenhum item em ${title.toLowerCase()}`} />
+                    </Card>
+                ) : (
+                    <Card style={styles.productList}>
+                        {availableProducts.map((productId, index) => {
+                            const isExpanded = expandedProduct === productId;
+                            const productReservations = reservas.filter(
+                                (reservation) =>
+                                    reservation.responsavelId === responsible &&
+                                    reservation.produtoId === productId &&
+                                    reservation.status === StatusReserva.ATIVA
+                            );
+                            const destinations = Array.from(
+                                new Set(productReservations.map((reservation) => reservation.destinoId))
+                            );
 
-                <Text
-                    style={styles.grupoTitulo}
-                >
-                    🧸 Pelúcias
-                </Text>
-
-                <Text
-                    style={styles.grupoDescricao}
-                >
-                    Estoque utilizado nos abastecimentos das máquinas
-                </Text>
-
-                {
-                    produtos.length === 0
-                        ? (
-                            <View
-                                style={styles.vazioGrupo}
-                            >
-                                <Text
-                                    style={styles.vazioTexto}
+                            return (
+                                <View
+                                    key={productId}
+                                    style={index > 0 ? styles.productBorder : undefined}
                                 >
-                                    Nenhuma pelúcia neste estoque.
-                                </Text>
-                            </View>
-                        )
-                        : produtos.map(
-                            (produtoId) => {
-
-                                const fisico =
-                                    quantidade(
-                                        produtoId
-                                    );
-
-                                const reservado =
-                                    ReservaService
-                                        .quantidadeReservada(
-                                            reservas,
-                                            produtoId,
-                                            pessoa
-                                        );
-
-                                const livre =
-                                    ReservaService
-                                        .quantidadeDisponivel(
-                                            estoque,
-                                            reservas,
-                                            produtoId
-                                        );
-
-                                const reservasProduto =
-                                    reservas.filter(
-                                        (reserva) =>
-                                            reserva.responsavelId ===
-                                                pessoa &&
-                                            reserva.produtoId ===
-                                                produtoId &&
-                                            reserva.status ===
-                                                StatusReserva.ATIVA
-                                    );
-
-                                const destinos =
-                                    Array.from(
-                                        new Set(
-                                            reservasProduto.map(
-                                                (reserva) =>
-                                                    reserva.destinoId
-                                            )
-                                        )
-                                    );
-
-                                return (
-                                    <View
-                                        key={
-                                            produtoId
-                                        }
-                                        style={styles.card}
+                                    <Pressable
+                                        accessibilityRole="button"
+                                        accessibilityState={{ expanded: isExpanded }}
+                                        onPress={() => setExpandedProduct(isExpanded ? null : productId)}
+                                        style={({ pressed }) => [
+                                            styles.productRow,
+                                            pressed && styles.pressed
+                                        ]}
                                     >
-
-                                        <Text
-                                            style={styles.produtoNome}
-                                        >
-                                            {
-                                                nomeProduto(
-                                                    produtoId
-                                                )
-                                            }
-                                        </Text>
-
-                                        <View
-                                            style={styles.numeros}
-                                        >
-
-                                            <View
-                                                style={styles.numeroColuna}
-                                            >
-                                                <Text
-                                                    style={styles.numeroLabel}
-                                                >
-                                                    Físico
-                                                </Text>
-
-                                                <Text
-                                                    style={styles.numeroValor}
-                                                >
-                                                    {fisico}
-                                                </Text>
-                                            </View>
-
-                                            <View
-                                                style={styles.numeroColuna}
-                                            >
-                                                <Text
-                                                    style={styles.numeroLabel}
-                                                >
-                                                    Reservado
-                                                </Text>
-
-                                                <Text
-                                                    style={styles.numeroValor}
-                                                >
-                                                    {reservado}
-                                                </Text>
-                                            </View>
-
-                                            <View
-                                                style={styles.numeroColuna}
-                                            >
-                                                <Text
-                                                    style={styles.numeroLabel}
-                                                >
-                                                    Livre
-                                                </Text>
-
-                                                <Text
-                                                    style={styles.numeroValor}
-                                                >
-                                                    {livre}
-                                                </Text>
-                                            </View>
-
+                                        <View style={styles.productContent}>
+                                            <Text style={styles.productName}>{nomeProduto(productId)}</Text>
+                                            <Text style={styles.productDetail}>
+                                                {isCart
+                                                    ? `${quantity(productId)} em posse`
+                                                    : `${quantity(productId)} físico · ${reserved(productId)} reservado · ${free(productId)} livre`}
+                                            </Text>
                                         </View>
+                                        <Text style={styles.productQuantity}>{quantity(productId)}</Text>
+                                        <Text style={styles.chevron}>{isExpanded ? "⌃" : "⌄"}</Text>
+                                    </Pressable>
 
-                                        {
-                                            destinos.length > 0
-                                                ? (
-                                                    <View
-                                                        style={styles.alocacao}
-                                                    >
-
-                                                        <Text
-                                                            style={styles.alocacaoTitulo}
-                                                        >
-                                                            Alocação
-                                                        </Text>
-
-                                                        {
-                                                            destinos.map(
-                                                                (destinoId) => {
-
-                                                                    const reservadoDestino =
-                                                                        ReservaService
-                                                                            .quantidadeReservadaNoDestino(
-                                                                                reservas,
-                                                                                produtoId,
-                                                                                pessoa,
-                                                                                destinoId
-                                                                            );
-
-                                                                    return (
-                                                                        <View
-                                                                            key={
-                                                                                destinoId
-                                                                            }
-                                                                            style={styles.alocacaoLinha}
-                                                                        >
-                                                                            <Text>
-                                                                                {
-                                                                                    nomeDestino(
-                                                                                        destinoId
-                                                                                    )
-                                                                                }
-                                                                            </Text>
-
-                                                                            <Text
-                                                                                style={styles.alocacaoValor}
-                                                                            >
-                                                                                {
-                                                                                    reservadoDestino
-                                                                                }
-                                                                            </Text>
-                                                                        </View>
-                                                                    );
-                                                                }
-                                                            )
-                                                        }
-
-                                                    </View>
-                                                )
-                                                : null
-                                        }
-
-                                        <Link
-                                            href={{
-                                                pathname:
-                                                    "/devolucao",
-
-                                                params: {
-                                                    responsavelId:
-                                                        pessoa,
-
-                                                    produtoId
-                                                }
-                                            }}
-                                            asChild
-                                        >
-                                            <TouchableOpacity
-                                                style={styles.botaoDevolver}
-                                            >
-                                                <Text
-                                                    style={styles.botaoDevolverTexto}
-                                                >
-                                                    Devolver ao Principal
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </Link>
-
-                                    </View>
-                                );
-                            }
-                        )
-                }
-
-            </View>
+                                    {isExpanded ? (
+                                        <View style={styles.details}>
+                                            {!isCart && destinations.length > 0 ? (
+                                                <View style={styles.allocations}>
+                                                    <Text style={styles.detailsTitle}>Alocação das reservas</Text>
+                                                    {destinations.map((destinationId) => (
+                                                        <View key={destinationId} style={styles.allocationRow}>
+                                                            <Text style={styles.allocationName}>{destinationName(destinationId)}</Text>
+                                                            <Text style={styles.allocationValue}>
+                                                                {ReservaService.quantidadeReservadaNoDestino(
+                                                                    reservas,
+                                                                    productId,
+                                                                    responsible,
+                                                                    destinationId
+                                                                )}
+                                                            </Text>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            ) : !isCart ? (
+                                                <Text style={styles.noAllocation}>Sem reserva ativa para este produto.</Text>
+                                            ) : null}
+                                            <Button
+                                                label="Devolver ao Principal"
+                                                variant="ghost"
+                                                onPress={() => router.push({
+                                                    pathname: "/devolucao",
+                                                    params: {
+                                                        responsavelId: responsible,
+                                                        produtoId: productId
+                                                    }
+                                                })}
+                                                style={styles.returnButton}
+                                            />
+                                        </View>
+                                    ) : null}
+                                </View>
+                            );
+                        })}
+                    </Card>
+                )}
+            </Section>
         );
     };
-
-    const renderCarrinho = () => {
-
-        const produtos =
-            PRODUTOS_CARRINHO.filter(
-                (produtoId) =>
-                    quantidade(
-                        produtoId
-                    ) > 0
-            );
-
-        return (
-            <View
-                style={styles.grupo}
-            >
-
-                <Text
-                    style={styles.grupoTitulo}
-                >
-                    🍿 Carrinho de Pipoca
-                </Text>
-
-                <Text
-                    style={styles.grupoDescricao}
-                >
-                    Insumos atualmente sob responsabilidade de {
-                        pessoa ===
-                        UsuarioId.RODRIGO
-                            ? "Rodrigo"
-                            : "Cesar"
-                    }
-                </Text>
-
-                {
-                    produtos.length === 0
-                        ? (
-                            <View
-                                style={styles.vazioGrupo}
-                            >
-                                <Text
-                                    style={styles.vazioTexto}
-                                >
-                                    Nenhum insumo do carrinho neste estoque.
-                                </Text>
-                            </View>
-                        )
-                        : produtos.map(
-                            (produtoId) => {
-
-                                const fisico =
-                                    quantidade(
-                                        produtoId
-                                    );
-
-                                return (
-                                    <View
-                                        key={
-                                            produtoId
-                                        }
-                                        style={styles.card}
-                                    >
-
-                                        <Text
-                                            style={styles.produtoNome}
-                                        >
-                                            {
-                                                nomeProduto(
-                                                    produtoId
-                                                )
-                                            }
-                                        </Text>
-
-                                        <View
-                                            style={styles.insumoLinha}
-                                        >
-
-                                            <View>
-                                                <Text
-                                                    style={styles.numeroLabel}
-                                                >
-                                                    Quantidade em posse
-                                                </Text>
-
-                                                <Text
-                                                    style={styles.numeroValor}
-                                                >
-                                                    {fisico}
-                                                </Text>
-                                            </View>
-
-                                        </View>
-
-                                        <Link
-                                            href={{
-                                                pathname:
-                                                    "/devolucao",
-
-                                                params: {
-                                                    responsavelId:
-                                                        pessoa,
-
-                                                    produtoId
-                                                }
-                                            }}
-                                            asChild
-                                        >
-                                            <TouchableOpacity
-                                                style={styles.botaoDevolver}
-                                            >
-                                                <Text
-                                                    style={styles.botaoDevolverTexto}
-                                                >
-                                                    Devolver ao Principal
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </Link>
-
-                                    </View>
-                                );
-                            }
-                        )
-                }
-
-            </View>
-        );
-    };
-
-    const totalPelucias =
-        PRODUTOS_PELUCIAS.reduce(
-            (total, produtoId) =>
-                total +
-                quantidade(
-                    produtoId
-                ),
-            0
-        );
-
-    const totalCarrinho =
-        PRODUTOS_CARRINHO.reduce(
-            (total, produtoId) =>
-                total +
-                quantidade(
-                    produtoId
-                ),
-            0
-        );
 
     return (
-        <SafeAreaView
-            style={styles.container}
-        >
+        <Screen>
+            <Text style={styles.subtitle}>Saldos físicos, reservas e disponibilidade por responsável.</Text>
 
-            <ScrollView
-                contentContainerStyle={
-                    styles.conteudo
-                }
-            >
+            <View style={styles.personSelector}>
+                <Chip label="Rodrigo" selected={responsible === UsuarioId.RODRIGO} onPress={() => changeResponsible(UsuarioId.RODRIGO)} />
+                <Chip label="Cesar" selected={responsible === UsuarioId.CESAR} onPress={() => changeResponsible(UsuarioId.CESAR)} />
+            </View>
 
-                <Text
-                    style={styles.titulo}
-                >
-                    Estoque pessoal
-                </Text>
-
-                <Text
-                    style={styles.subtitulo}
-                >
-                    Produtos fisicamente sob responsabilidade de cada pessoa
-                </Text>
-
-                <View
-                    style={styles.seletor}
-                >
-
-                    <TouchableOpacity
-                        style={[
-                            styles.botaoPessoa,
-
-                            pessoa ===
-                                UsuarioId.RODRIGO &&
-                            styles.botaoSelecionado
-                        ]}
-                        onPress={
-                            () =>
-                                setPessoa(
-                                    UsuarioId.RODRIGO
-                                )
-                        }
-                    >
-                        <Text
-                            style={[
-                                styles.textoPessoa,
-
-                                pessoa ===
-                                    UsuarioId.RODRIGO &&
-                                styles.textoSelecionado
-                            ]}
-                        >
-                            Rodrigo
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.botaoPessoa,
-
-                            pessoa ===
-                                UsuarioId.CESAR &&
-                            styles.botaoSelecionado
-                        ]}
-                        onPress={
-                            () =>
-                                setPessoa(
-                                    UsuarioId.CESAR
-                                )
-                        }
-                    >
-                        <Text
-                            style={[
-                                styles.textoPessoa,
-
-                                pessoa ===
-                                    UsuarioId.CESAR &&
-                                styles.textoSelecionado
-                            ]}
-                        >
-                            Cesar
-                        </Text>
-                    </TouchableOpacity>
-
+            <Card style={styles.summary}>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{physicalTotal}</Text>
+                    <Text style={styles.summaryLabel}>Físico</Text>
                 </View>
-
-                <View
-                    style={styles.resumo}
-                >
-
-                    <View
-                        style={styles.resumoColuna}
-                    >
-                        <Text
-                            style={styles.resumoLabel}
-                        >
-                            Pelúcias
-                        </Text>
-
-                        <Text
-                            style={styles.resumoValor}
-                        >
-                            {totalPelucias}
-                        </Text>
-                    </View>
-
-                    <View
-                        style={styles.resumoColuna}
-                    >
-                        <Text
-                            style={styles.resumoLabel}
-                        >
-                            Carrinho
-                        </Text>
-
-                        <Text
-                            style={styles.resumoValor}
-                        >
-                            {totalCarrinho}
-                        </Text>
-                    </View>
-
-                    <View
-                        style={styles.resumoColuna}
-                    >
-                        <Text
-                            style={styles.resumoLabel}
-                        >
-                            Total
-                        </Text>
-
-                        <Text
-                            style={styles.resumoValor}
-                        >
-                            {
-                                totalPelucias +
-                                totalCarrinho
-                            }
-                        </Text>
-                    </View>
-
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{reservedTotal}</Text>
+                    <Text style={styles.summaryLabel}>Reservado</Text>
                 </View>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{freeTotal}</Text>
+                    <Text style={styles.summaryLabel}>Livre</Text>
+                </View>
+            </Card>
 
-                {renderPelucias()}
+            {renderGroup("Pelúcias", PRODUTOS_PELUCIAS, false)}
+            {renderGroup("Carrinho", PRODUTOS_CARRINHO, true)}
 
-                {renderCarrinho()}
-
-            </ScrollView>
-
-        </SafeAreaView>
+            <Section title="Ações do carrinho">
+                <Button
+                    label="Registrar consumo"
+                    variant="secondary"
+                    onPress={() => router.push("/consumo-carrinho")}
+                />
+            </Section>
+        </Screen>
     );
 }
 
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            backgroundColor: "#F5F5F5"
-        },
-
-        conteudo: {
-            padding: 20,
-            paddingBottom: 60
-        },
-
-        titulo: {
-            fontSize: 30,
-            fontWeight: "800"
-        },
-
-        subtitulo: {
-            color: "#666666",
-            marginTop: 4,
-            marginBottom: 22
-        },
-
-        seletor: {
-            flexDirection: "row",
-            gap: 10,
-            marginBottom: 20
-        },
-
-        botaoPessoa: {
-            flex: 1,
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#DDDDDD",
-            borderRadius: 12,
-            padding: 13,
-            alignItems: "center"
-        },
-
-        botaoSelecionado: {
-            backgroundColor: "#111111",
-            borderColor: "#111111"
-        },
-
-        textoPessoa: {
-            fontWeight: "700"
-        },
-
-        textoSelecionado: {
-            color: "#FFFFFF"
-        },
-
-        resumo: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 28,
-            flexDirection: "row"
-        },
-
-        resumoColuna: {
-            flex: 1
-        },
-
-        resumoLabel: {
-            color: "#777777",
-            fontSize: 12
-        },
-
-        resumoValor: {
-            fontSize: 24,
-            fontWeight: "800",
-            marginTop: 3
-        },
-
-        grupo: {
-            marginBottom: 28
-        },
-
-        grupoTitulo: {
-            fontSize: 21,
-            fontWeight: "800"
-        },
-
-        grupoDescricao: {
-            fontSize: 13,
-            color: "#666666",
-            marginTop: 3,
-            marginBottom: 12
-        },
-
-        card: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 10
-        },
-
-        produtoNome: {
-            fontSize: 18,
-            fontWeight: "800",
-            marginBottom: 14
-        },
-
-        numeros: {
-            flexDirection: "row"
-        },
-
-        numeroColuna: {
-            flex: 1
-        },
-
-        numeroLabel: {
-            fontSize: 12,
-            color: "#777777"
-        },
-
-        numeroValor: {
-            fontSize: 21,
-            fontWeight: "700",
-            marginTop: 3
-        },
-
-        insumoLinha: {
-            marginBottom: 4
-        },
-
-        alocacao: {
-            borderTopWidth: 1,
-            borderTopColor: "#EEEEEE",
-            marginTop: 14,
-            paddingTop: 12
-        },
-
-        alocacaoTitulo: {
-            fontSize: 13,
-            color: "#666666",
-            marginBottom: 8
-        },
-
-        alocacaoLinha: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 5
-        },
-
-        alocacaoValor: {
-            fontWeight: "700"
-        },
-
-        botaoDevolver: {
-            marginTop: 14,
-            borderWidth: 1,
-            borderColor: "#CCCCCC",
-            borderRadius: 10,
-            padding: 11,
-            alignItems: "center"
-        },
-
-        botaoDevolverTexto: {
-            fontWeight: "700"
-        },
-
-        vazioGrupo: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 12,
-            padding: 18
-        },
-
-        vazioTexto: {
-            color: "#666666"
-        }
-    });
+const styles = StyleSheet.create({
+    subtitle: { ...Typography.body, color: Palette.textSecondary },
+    personSelector: { flexDirection: "row", gap: Spacing.two, marginTop: Spacing.three },
+    summary: { flexDirection: "row", marginTop: Spacing.three },
+    summaryItem: { flex: 1, alignItems: "center" },
+    summaryValue: { fontSize: 24, lineHeight: 30, fontWeight: "700", color: Palette.text },
+    summaryLabel: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    productList: { paddingVertical: 0 },
+    productBorder: { borderTopWidth: 1, borderTopColor: Palette.border },
+    productRow: { minHeight: 64, flexDirection: "row", alignItems: "center" },
+    pressed: { opacity: 0.65 },
+    productContent: { flex: 1, paddingRight: Spacing.two },
+    productName: { ...Typography.body, color: Palette.text, fontWeight: "600" },
+    productDetail: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    productQuantity: { ...Typography.cardTitle, color: Palette.text, marginRight: Spacing.compact },
+    chevron: { fontSize: 18, color: Palette.primary },
+    details: { backgroundColor: Palette.background, borderRadius: 10, padding: Spacing.compact, marginBottom: Spacing.compact },
+    allocations: { gap: Spacing.two },
+    detailsTitle: { ...Typography.label, color: Palette.text, fontWeight: "700" },
+    allocationRow: { flexDirection: "row", justifyContent: "space-between" },
+    allocationName: { ...Typography.label, color: Palette.textSecondary },
+    allocationValue: { ...Typography.label, color: Palette.text, fontWeight: "700" },
+    noAllocation: { ...Typography.label, color: Palette.textSecondary },
+    returnButton: { marginTop: Spacing.two },
+});

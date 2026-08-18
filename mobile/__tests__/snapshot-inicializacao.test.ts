@@ -94,6 +94,22 @@ describe("inicialização pelo snapshot", () => {
 
         expect(resultado.dados).toBe(cache);
         expect(salvar).not.toHaveBeenCalled();
+        expect(resultado.estadoSincronizacao).toBe("ERRO");
+    });
+
+    test("quantidade remota inválida não destrói cache", async () => {
+        const cache = criarDadosIniciais();
+        const snapshot = snapshotValido();
+        snapshot.estoques[0].itens[0].quantidade = -1;
+        jest.spyOn(PersistenceService, "carregar").mockResolvedValue({ tipo: "VALIDO", dados: cache });
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot);
+        const salvar = jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        const resultado = await InicializacaoService.carregar();
+
+        expect(resultado.dados).toBe(cache);
+        expect(resultado.estadoSincronizacao).toBe("ERRO");
+        expect(salvar).not.toHaveBeenCalled();
     });
 
     test("estado ONLINE após sucesso", async () => {
@@ -118,5 +134,72 @@ describe("inicialização pelo snapshot", () => {
         const resultado = await InicializacaoService.carregar();
 
         expect(resultado.dados).toEqual(criarDadosIniciais());
+    });
+
+    test("primeira execução com backend disponível usa snapshot oficial", async () => {
+        jest.spyOn(PersistenceService, "carregar").mockResolvedValue({ tipo: "AUSENTE" });
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshotValido());
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        const resultado = await InicializacaoService.carregar();
+
+        expect(resultado.dados.estoquePrincipal.itens[0].quantidade).toBe(9);
+        expect(resultado.estadoSincronizacao).toBe("ONLINE");
+    });
+
+    test("falha ao atualizar cache não descarta snapshot remoto válido", async () => {
+        jest.spyOn(PersistenceService, "carregar").mockResolvedValue({ tipo: "AUSENTE" });
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshotValido());
+        jest.spyOn(PersistenceService, "salvar").mockRejectedValue(new Error("storage indisponível"));
+
+        const resultado = await InicializacaoService.carregar();
+
+        expect(resultado.dados.estoquePrincipal.itens[0].quantidade).toBe(9);
+        expect(resultado.estadoSincronizacao).toBe("ERRO");
+    });
+});
+
+describe("ApiService", () => {
+    const apiUrlAnterior = process.env.EXPO_PUBLIC_API_URL;
+
+    afterEach(() => {
+        if (apiUrlAnterior === undefined) {
+            delete process.env.EXPO_PUBLIC_API_URL;
+        } else {
+            process.env.EXPO_PUBLIC_API_URL = apiUrlAnterior;
+        }
+        jest.restoreAllMocks();
+    });
+
+    test("monta URL do snapshot com EXPO_PUBLIC_API_URL", async () => {
+        process.env.EXPO_PUBLIC_API_URL = "https://api.stockflow.test/";
+        const buscar = jest.spyOn(global, "fetch").mockResolvedValue({
+            ok: true,
+            json: async () => snapshotValido()
+        } as Response);
+
+        await ApiService.obterSnapshot();
+
+        expect(buscar).toHaveBeenCalledWith(
+            "https://api.stockflow.test/api/v1/snapshot"
+        );
+    });
+
+    test("retorna snapshot remoto válido recebido como JSON", async () => {
+        process.env.EXPO_PUBLIC_API_URL = "https://api.stockflow.test";
+        jest.spyOn(global, "fetch").mockResolvedValue({
+            ok: true,
+            json: async () => snapshotValido()
+        } as Response);
+
+        await expect(ApiService.obterSnapshot()).resolves.toEqual(snapshotValido());
+    });
+
+    test("não usa localhost quando a URL não foi configurada", async () => {
+        delete process.env.EXPO_PUBLIC_API_URL;
+        const buscar = jest.spyOn(global, "fetch");
+
+        await expect(ApiService.obterSnapshot()).rejects.toThrow("Servidor não configurado");
+        expect(buscar).not.toHaveBeenCalled();
     });
 });

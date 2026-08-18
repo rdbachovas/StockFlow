@@ -25,13 +25,16 @@ jest.mock(
     })
 );
 
-function retirada(): RetiradaEstoque {
+function retirada(
+    responsavelId = "RODRIGO",
+    itens = [{ produtoId: ProdutoId.MIX, quantidade: 2 }]
+): RetiradaEstoque {
     return {
         id: "local",
         estoqueOrigemId: "ESTOQUE_PRINCIPAL",
-        estoqueDestinoId: "ESTOQUE_RODRIGO",
-        responsavelId: "RODRIGO",
-        itens: [{ produtoId: ProdutoId.MIX, quantidade: 2 }],
+        estoqueDestinoId: responsavelId === "RODRIGO" ? "ESTOQUE_RODRIGO" : "ESTOQUE_CESAR",
+        responsavelId,
+        itens,
         data: new Date("2026-08-11T12:00:00Z")
     };
 }
@@ -68,6 +71,34 @@ describe("retirada remota", () => {
         expect(post).toHaveBeenCalledWith(expect.objectContaining({ responsavelId: "RODRIGO" }));
     });
 
+    test("retirada remota para Cesar envia a intenção correta", async () => {
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        await RetiradaRemotaService.registrar(retirada("CESAR"), "ONLINE");
+
+        expect(post).toHaveBeenCalledWith(expect.objectContaining({
+            responsavelId: "CESAR",
+            itens: [{ produtoId: ProdutoId.MIX, quantidade: 2 }]
+        }));
+    });
+
+    test("retirada remota envia múltiplos produtos em uma operação", async () => {
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+        const itens = [
+            { produtoId: ProdutoId.MIX, quantidade: 2 },
+            { produtoId: ProdutoId.CAPIVARAS, quantidade: 4 }
+        ];
+
+        await RetiradaRemotaService.registrar(retirada("RODRIGO", itens), "ONLINE");
+
+        expect(post).toHaveBeenCalledWith(expect.objectContaining({ itens }));
+        expect(post).toHaveBeenCalledTimes(1);
+    });
+
     test("sucesso atualiza pelo snapshot oficial", async () => {
         jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
@@ -97,6 +128,23 @@ describe("retirada remota", () => {
         await expect(RetiradaRemotaService.registrar(retirada(), "ONLINE")).rejects.toThrow("rejeitada");
         expect(obter).not.toHaveBeenCalled();
         expect(estadoAnterior.estoques[0].itens[0].quantidade).toBe(8);
+    });
+
+    test.each([
+        [400, "dados inválidos"],
+        [404, "não encontrado"],
+        [409, "conflito"]
+    ])("erro HTTP %i não busca snapshot nem altera cache", async (status, mensagem) => {
+        jest.spyOn(ApiService, "registrarRetirada").mockRejectedValue(new ErroApi(mensagem, status));
+        const obter = jest.spyOn(ApiService, "obterSnapshot");
+        const salvar = jest.spyOn(PersistenceService, "salvar");
+        const local = jest.spyOn(RetiradaEstoqueService, "registrar");
+
+        await expect(RetiradaRemotaService.registrar(retirada(), "ONLINE")).rejects.toThrow(mensagem);
+
+        expect(obter).not.toHaveBeenCalled();
+        expect(salvar).not.toHaveBeenCalled();
+        expect(local).not.toHaveBeenCalled();
     });
 
     test("falha de rede não executa regra local", async () => {

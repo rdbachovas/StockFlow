@@ -14,10 +14,14 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
     default: { getItem: jest.fn(), setItem: jest.fn() }
 }));
 
-function reserva(): Reserva {
+function reserva(responsavelId: "RODRIGO" | "CESAR" = "RODRIGO"): Reserva {
     return {
-        id: "local", responsavelId: "RODRIGO", destinoId: DestinoReservaId.BOULEVARD,
-        produtoId: ProdutoId.MIX, quantidade: 4, quantidadeUtilizada: 0,
+        id: "local", responsavelId,
+        destinoId: responsavelId === "RODRIGO"
+            ? DestinoReservaId.BOULEVARD
+            : DestinoReservaId.AEROPORTO,
+        produtoId: responsavelId === "RODRIGO" ? ProdutoId.MIX : ProdutoId.STITCH,
+        quantidade: 4, quantidadeUtilizada: 0,
         status: StatusReserva.ATIVA
     };
 }
@@ -63,6 +67,18 @@ describe("reservas remotas", () => {
         expect((await ReservaRemotaService.criar(reserva(), "ONLINE")).reservas[0].id).toBe("backend-id");
     });
 
+    test("criação remota para Cesar envia a intenção correta", async () => {
+        const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        preparar();
+        await ReservaRemotaService.criar(reserva("CESAR"), "ONLINE");
+        expect(post).toHaveBeenCalledWith({
+            responsavelId: "CESAR",
+            destino: "AEROPORTO",
+            produtoId: "STITCH",
+            quantidade: 4
+        });
+    });
+
     test("criação persiste cache", async () => {
         jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
         preparar();
@@ -97,6 +113,7 @@ describe("reservas remotas", () => {
         preparar(snapshot("CANCELADA"));
         const dados = await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
         expect(dados.reservas[0].status).toBe(StatusReserva.CANCELADA);
+        expect(PersistenceService.salvar).toHaveBeenCalledWith(dados);
     });
 
     test("erro no cancelamento preserva estado", async () => {
@@ -104,6 +121,53 @@ describe("reservas remotas", () => {
         const obter = jest.spyOn(ApiService, "obterSnapshot");
         await expect(ReservaRemotaService.cancelar("id", "RODRIGO", "ONLINE")).rejects.toThrow("não cancelada");
         expect(obter).not.toHaveBeenCalled();
+    });
+
+    test.each([400, 404, 409])(
+        "erro HTTP %i na criação não busca snapshot nem altera cache",
+        async (status) => {
+            jest.spyOn(ApiService, "criarReserva").mockRejectedValue(
+                new ErroApi(`erro ${status}`, status)
+            );
+            const obter = jest.spyOn(ApiService, "obterSnapshot");
+            const salvar = jest.spyOn(PersistenceService, "salvar");
+            await expect(
+                ReservaRemotaService.criar(reserva(), "ONLINE")
+            ).rejects.toThrow(`erro ${status}`);
+            expect(obter).not.toHaveBeenCalled();
+            expect(salvar).not.toHaveBeenCalled();
+        }
+    );
+
+    test.each([400, 404, 409])(
+        "erro HTTP %i no cancelamento não busca snapshot nem altera cache",
+        async (status) => {
+            jest.spyOn(ApiService, "cancelarReserva").mockRejectedValue(
+                new ErroApi(`erro ${status}`, status)
+            );
+            const obter = jest.spyOn(ApiService, "obterSnapshot");
+            const salvar = jest.spyOn(PersistenceService, "salvar");
+            const local = jest.spyOn(ReservaService, "cancelarReserva");
+            await expect(
+                ReservaRemotaService.cancelar("id", "RODRIGO", "ONLINE")
+            ).rejects.toThrow(`erro ${status}`);
+            expect(obter).not.toHaveBeenCalled();
+            expect(salvar).not.toHaveBeenCalled();
+            expect(local).not.toHaveBeenCalled();
+        }
+    );
+
+    test("falha de rede não busca snapshot nem altera cache", async () => {
+        jest.spyOn(ApiService, "criarReserva").mockRejectedValue(
+            new ErroApi("Não foi possível conectar ao servidor.")
+        );
+        const obter = jest.spyOn(ApiService, "obterSnapshot");
+        const salvar = jest.spyOn(PersistenceService, "salvar");
+        await expect(
+            ReservaRemotaService.criar(reserva(), "ONLINE")
+        ).rejects.toThrow("conectar");
+        expect(obter).not.toHaveBeenCalled();
+        expect(salvar).not.toHaveBeenCalled();
     });
 
     test("offline bloqueia cancelamento", async () => {

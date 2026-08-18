@@ -1,5 +1,9 @@
 import { SnapshotDto } from "../dtos/SnapshotDto";
 import {
+    RegistrarAbastecimentoRequestDto,
+    RegistrarAbastecimentoResponseDto
+} from "../dtos/AbastecimentoDto";
+import {
     RegistrarRetiradaRequestDto,
     RegistrarRetiradaResponseDto
 } from "../dtos/RetiradaDto";
@@ -8,6 +12,10 @@ import {
     CriarReservaRequestDto,
     ReservaResponseDto
 } from "../dtos/ReservaDto";
+import {
+    RegistrarDevolucaoRequestDto,
+    RegistrarDevolucaoResponseDto
+} from "../dtos/DevolucaoDto";
 
 export class ErroApi extends Error {
     constructor(
@@ -31,7 +39,13 @@ export class ApiService {
     }
 
     private static async erro(resposta: Response): Promise<ErroApi> {
-        let mensagem = `Operação rejeitada pelo servidor (HTTP ${resposta.status}).`;
+        const mensagens: Record<number, string> = {
+            400: "Os dados enviados são inválidos ou a operação não pode ser realizada.",
+            404: "O recurso informado não foi encontrado.",
+            409: "A operação entrou em conflito com o estado atual. Atualize e tente novamente."
+        };
+        let mensagem = mensagens[resposta.status] ??
+            `Operação rejeitada pelo servidor (HTTP ${resposta.status}).`;
 
         try {
             const corpo = await resposta.json() as Record<string, unknown>;
@@ -49,9 +63,10 @@ export class ApiService {
 
     static async obterSnapshot(): Promise<SnapshotDto> {
         let resposta: Response;
+        const url = `${this.apiUrl()}/api/v1/snapshot`;
 
         try {
-            resposta = await fetch(`${this.apiUrl()}/api/v1/snapshot`);
+            resposta = await fetch(url);
         } catch {
             throw new ErroApi("Não foi possível conectar ao servidor.");
         }
@@ -68,9 +83,10 @@ export class ApiService {
         retirada: RegistrarRetiradaRequestDto
     ): Promise<RegistrarRetiradaResponseDto> {
         let resposta: Response;
+        const url = `${this.apiUrl()}/api/v1/retiradas`;
 
         try {
-            resposta = await fetch(`${this.apiUrl()}/api/v1/retiradas`, {
+            resposta = await fetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -104,6 +120,24 @@ export class ApiService {
         return await this.post<ReservaResponseDto>(
             `/api/v1/reservas/${encodeURIComponent(reservaId)}/cancelamento`,
             cancelamento
+        );
+    }
+
+    static async registrarAbastecimento(
+        abastecimento: RegistrarAbastecimentoRequestDto
+    ): Promise<RegistrarAbastecimentoResponseDto> {
+        return await this.post<RegistrarAbastecimentoResponseDto>(
+            "/api/v1/abastecimentos",
+            abastecimento
+        );
+    }
+
+    static async registrarDevolucao(
+        devolucao: RegistrarDevolucaoRequestDto
+    ): Promise<RegistrarDevolucaoResponseDto> {
+        return await this.post<RegistrarDevolucaoResponseDto>(
+            "/api/v1/devolucoes",
+            devolucao
         );
     }
 

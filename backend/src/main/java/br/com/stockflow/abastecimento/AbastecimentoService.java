@@ -53,7 +53,8 @@ public class AbastecimentoService {
 
     @Transactional
     public AbastecimentoResponse registrar(AbastecimentoRequest request) {
-        validarResponsavel(request.responsavelId(), request.local());
+        DestinoReserva destinoReserva = request.local().destinoReserva();
+        validarResponsavel(request.responsavelId(), destinoReserva);
 
         Estoque estoque = estoqueRepository
                 .findByResponsavelId(request.responsavelId())
@@ -61,7 +62,10 @@ public class AbastecimentoService {
                         "Responsável inválido."
                 ));
 
-        Map<String, Integer> quantidadePorProduto = agregarEValidar(request);
+        Map<String, Integer> quantidadePorProduto = agregarEValidar(
+                request,
+                destinoReserva
+        );
         List<EstoqueItem> itensEstoque = estoqueItemRepository
                 .buscarParaAtualizacao(
                         estoque.getId(),
@@ -80,7 +84,7 @@ public class AbastecimentoService {
                 reservas
         );
         validarDisponibilidade(
-                request.local(),
+                destinoReserva,
                 quantidadePorProduto,
                 estoquePorProduto,
                 reservasPorProduto
@@ -112,7 +116,7 @@ public class AbastecimentoService {
             int saldoAnterior = itemEstoque.getQuantidade();
 
             consumirReservas(
-                    request.local(),
+                    destinoReserva,
                     entrada.getValue(),
                     reservasPorProduto.getOrDefault(
                             entrada.getKey(),
@@ -136,12 +140,13 @@ public class AbastecimentoService {
     }
 
     private Map<String, Integer> agregarEValidar(
-            AbastecimentoRequest request
+            AbastecimentoRequest request,
+            DestinoReserva destinoReserva
     ) {
         Map<String, Integer> quantidades = new LinkedHashMap<>();
         for (AbastecimentoRequest.Item item : request.itens()) {
             validarMaquinaEProduto(
-                    request.local(),
+                    destinoReserva,
                     item.maquinaId(),
                     item.produtoId()
             );

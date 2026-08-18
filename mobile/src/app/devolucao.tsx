@@ -1,34 +1,17 @@
 import React from "react";
 
-import {
-    StyleSheet,
-    Text,
-    View
-} from "react-native";
-
-import {
-    useLocalSearchParams
-} from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 
 import { useApp } from "../context/AppContext";
-
 import { ProdutoId } from "../models/Produto";
 import { UsuarioId } from "../models/Usuario";
+import { DevolucaoEstoqueScreen } from "../screens/DevolucaoEstoqueScreen";
 
-import {
-    DevolucaoEstoqueScreen
-} from "../screens/DevolucaoEstoqueScreen";
-
-export default function DevolucaoPage() {
-
-    const {
-        responsavelId,
-        produtoId
-    } = useLocalSearchParams<{
-        responsavelId: string;
-        produtoId: string;
+export default function ReturnPage() {
+    const { responsavelId, produtoId } = useLocalSearchParams<{
+        responsavelId?: string;
+        produtoId?: string;
     }>();
-
     const {
         estoquePrincipal,
         estoqueRodrigo,
@@ -37,76 +20,15 @@ export default function DevolucaoPage() {
         registrarDevolucao
     } = useApp();
 
-    const responsavel =
-        responsavelId as
-            UsuarioId;
-
-    const produto =
-        produtoId as
-            ProdutoId;
-
-    const estoquePessoal =
-        responsavel ===
-            UsuarioId.RODRIGO
-            ? estoqueRodrigo
-            : responsavel ===
-                UsuarioId.CESAR
-                ? estoqueCesar
-                : undefined;
-
-    if (
-        !estoquePessoal ||
-        !produto
-    ) {
-
-        return (
-            <View
-                style={styles.container}
-            >
-                <Text>
-                    Dados da devolução inválidos.
-                </Text>
-            </View>
-        );
-    }
-
     return (
         <DevolucaoEstoqueScreen
-
-            responsavelId={
-                responsavel
-            }
-
-            produtoId={
-                produto
-            }
-
-            estoquePessoal={
-                estoquePessoal
-            }
-
-            estoquePrincipal={
-                estoquePrincipal
-            }
-
-            reservas={
-                reservas
-            }
-
-            registrarDevolucao={
-                registrarDevolucao
-            }
-
+            responsavelInicial={responsavelId === UsuarioId.CESAR ? UsuarioId.CESAR : UsuarioId.RODRIGO}
+            produtoInicial={produtoId as ProdutoId | undefined}
+            estoqueRodrigo={estoqueRodrigo}
+            estoqueCesar={estoqueCesar}
+            estoquePrincipal={estoquePrincipal}
+            reservas={reservas}
+            registrarDevolucao={registrarDevolucao}
         />
     );
 }
-
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center"
-        }
-    });

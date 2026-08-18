@@ -4,45 +4,34 @@ import React, {
 } from "react";
 
 import {
-    SafeAreaView,
-    ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View
 } from "react-native";
 
 import {
-    Abastecimento
-} from "../models/Abastecimento";
-
+    HISTORY_PERIOD_OPTIONS,
+    HistoryFilters,
+    HistoryPeriod,
+    isWithinHistoryPeriod
+} from "../components/history/HistoryFilters";
+import { MovementCard } from "../components/history/MovementCard";
+import { Screen } from "../components/layout/Screen";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
 import {
-    ConsumoCarrinho
-} from "../models/ConsumoCarrinho";
-
-import {
-    DevolucaoEstoque
-} from "../models/DevolucaoEstoque";
-
-import {
-    LocalId
-} from "../models/Local";
-
-import {
-    ProdutoId
-} from "../models/Produto";
-
-import {
-    RetiradaEstoque
-} from "../models/RetiradaEstoque";
-
-import {
-    UsuarioId
-} from "../models/Usuario";
-
-import {
-    nomeProduto
-} from "../utils/ProdutoUtils";
+    Palette,
+    Spacing,
+    Typography
+} from "../constants/theme";
+import { Abastecimento } from "../models/Abastecimento";
+import { ConsumoCarrinho } from "../models/ConsumoCarrinho";
+import { DevolucaoEstoque } from "../models/DevolucaoEstoque";
+import { LocalId } from "../models/Local";
+import { ProdutoId } from "../models/Produto";
+import { RetiradaEstoque } from "../models/RetiradaEstoque";
+import { UsuarioId } from "../models/Usuario";
+import { nomeProduto } from "../utils/ProdutoUtils";
 
 interface Props {
     retiradas: RetiradaEstoque[];
@@ -51,783 +40,79 @@ interface Props {
     consumosCarrinho: ConsumoCarrinho[];
 }
 
-interface ItemHistorico {
-    produtoId: ProdutoId;
-    quantidade: number;
+type HistoryType = "TODOS" | "ENTRADA" | "ABASTECIMENTO" | "DEVOLUCAO" | "CONSUMO";
+type ResponsibleFilter = "TODOS" | UsuarioId;
+interface HistoryItem { produtoId: ProdutoId; quantidade: number; anterior?: number; posterior?: number; }
+interface PersonalEvent { id: string; type: Exclude<HistoryType, "TODOS">; responsible: string; date: Date; context: string; items: HistoryItem[]; observation?: string; }
+
+function responsibleName(id: string): string { return id === UsuarioId.RODRIGO ? "Rodrigo" : id === UsuarioId.CESAR ? "Cesar" : id; }
+function locationName(id: LocalId): string {
+    return ({
+        [LocalId.BOULEVARD]: "Boulevard", [LocalId.AEROPORTO]: "Aeroporto", [LocalId.MERCADOS]: "Mercados",
+        [LocalId.GAUCHO_VICENTE_FONTOURA]: "Gauchão Vicente da Fontoura", [LocalId.SUPERMAGO_IPIRANGA]: "SuperMago Ipiranga",
+        [LocalId.GAUCHO_ANTONIO_CARVALHO]: "Gauchão Antônio de Carvalho", [LocalId.SUPERMERCADO_FANTE]: "Supermercado Fante",
+        [LocalId.SUPERMAGO_PLANALTO]: "SuperMago Planalto", [LocalId.SAMS_CLUB]: "Sam's Club", [LocalId.SUPERMAGO_BOA_VISTA]: "SuperMago Boa Vista"
+    } as Record<LocalId, string>)[id];
+}
+function typeName(type: PersonalEvent["type"]): string {
+    return type === "ENTRADA" ? "Entrada" : type === "ABASTECIMENTO" ? "Abastecimento" : type === "DEVOLUCAO" ? "Devolução" : "Consumo do carrinho";
 }
 
-type TipoHistorico =
-    | "ENTRADA"
-    | "ABASTECIMENTO"
-    | "DEVOLUCAO"
-    | "CONSUMO_CARRINHO";
-
-interface MovimentoHistorico {
-    id: string;
-
-    tipo: TipoHistorico;
-
-    responsavelId: string;
-
-    data: Date;
-
-    titulo: string;
-
-    descricao: string;
-
-    itens: ItemHistorico[];
-
-    total: number;
-}
-
-function nomeLocal(
-    localId: LocalId
-): string {
-
-    switch (localId) {
-
-        case LocalId.BOULEVARD:
-            return "Boulevard";
-
-        case LocalId.AEROPORTO:
-            return "Aeroporto";
-
-        case LocalId.GAUCHO_VICENTE_FONTOURA:
-            return "Gauchão Vicente da Fontoura";
-
-        case LocalId.SUPERMAGO_IPIRANGA:
-            return "SuperMago Ipiranga";
-
-        case LocalId.GAUCHO_ANTONIO_CARVALHO:
-            return "Gauchão Antônio de Carvalho";
-
-        case LocalId.SUPERMERCADO_FANTE:
-            return "Supermercado Fante";
-
-        case LocalId.SUPERMAGO_PLANALTO:
-            return "SuperMago Planalto";
-
-        case LocalId.SAMS_CLUB:
-            return "Sam's Club";
-
-        case LocalId.SUPERMAGO_BOA_VISTA:
-            return "SuperMago Boa Vista";
-
-        default:
-            return String(localId);
-    }
-}
-
-function nomeResponsavel(
-    responsavelId: string
-): string {
-
-    return responsavelId ===
-        UsuarioId.RODRIGO
-        ? "Rodrigo"
-        : responsavelId ===
-            UsuarioId.CESAR
-            ? "Cesar"
-            : responsavelId;
-}
-
-function agruparItens(
-    itens: ItemHistorico[]
-): ItemHistorico[] {
-
-    const mapa =
-        new Map<
-            ProdutoId,
-            number
-        >();
-
-    for (
-        const item
-        of itens
-    ) {
-
-        mapa.set(
-            item.produtoId,
-
-            (
-                mapa.get(
-                    item.produtoId
-                ) ?? 0
-            ) +
-            item.quantidade
-        );
-    }
-
-    return Array.from(
-        mapa.entries()
-    ).map(
-        (
-            [
-                produtoId,
-                quantidade
-            ]
-        ) => ({
-            produtoId,
-            quantidade
-        })
-    );
-}
-
-export function HistoricoEstoquePessoalScreen({
-    retiradas,
-    abastecimentos,
-    devolucoes,
-    consumosCarrinho
-}: Props) {
-
-    const [
-        filtroResponsavel,
-        setFiltroResponsavel
-    ] = useState<
-        UsuarioId | "TODOS"
-    >("TODOS");
-
-    const movimentos =
-        useMemo(
-            (): MovimentoHistorico[] => {
-
-                const resultado:
-                    MovimentoHistorico[] = [];
-
-                for (
-                    const retirada
-                    of retiradas
-                ) {
-
-                    const itens =
-                        retirada.itens.map(
-                            (item) => ({
-                                produtoId:
-                                    item.produtoId,
-
-                                quantidade:
-                                    item.quantidade
-                            })
-                        );
-
-                    resultado.push({
-
-                        id:
-                            `RET_${retirada.id}`,
-
-                        tipo:
-                            "ENTRADA",
-
-                        responsavelId:
-                            retirada.responsavelId,
-
-                        data:
-                            retirada.data,
-
-                        titulo:
-                            "Entrada no estoque pessoal",
-
-                        descricao:
-                            `Estoque Principal → ${nomeResponsavel(
-                                retirada.responsavelId
-                            )}`,
-
-                        itens,
-
-                        total:
-                            itens.reduce(
-                                (soma, item) =>
-                                    soma +
-                                    item.quantidade,
-                                0
-                            )
-                    });
-                }
-
-                for (
-                    const abastecimento
-                    of abastecimentos
-                ) {
-
-                    const itens =
-                        agruparItens(
-                            abastecimento.itens.map(
-                                (item) => ({
-                                    produtoId:
-                                        item.produtoId,
-
-                                    quantidade:
-                                        item.quantidade
-                                })
-                            )
-                        );
-
-                    resultado.push({
-
-                        id:
-                            `ABA_${abastecimento.id}`,
-
-                        tipo:
-                            "ABASTECIMENTO",
-
-                        responsavelId:
-                            abastecimento.responsavelId,
-
-                        data:
-                            abastecimento.data,
-
-                        titulo:
-                            "Saída para abastecimento",
-
-                        descricao:
-                            `${nomeResponsavel(
-                                abastecimento.responsavelId
-                            )} → ${nomeLocal(
-                                abastecimento.localId
-                            )}`,
-
-                        itens,
-
-                        total:
-                            itens.reduce(
-                                (soma, item) =>
-                                    soma +
-                                    item.quantidade,
-                                0
-                            )
-                    });
-                }
-
-                for (
-                    const devolucao
-                    of devolucoes
-                ) {
-
-                    const itens =
-                        devolucao.itens.map(
-                            (item) => {
-
-                                const reservado =
-                                    item.reservas.reduce(
-                                        (
-                                            soma,
-                                            parcela
-                                        ) =>
-                                            soma +
-                                            parcela.quantidade,
-                                        0
-                                    );
-
-                                return {
-                                    produtoId:
-                                        item.produtoId,
-
-                                    quantidade:
-                                        item.quantidadeLivre +
-                                        reservado
-                                };
-                            }
-                        );
-
-                    resultado.push({
-
-                        id:
-                            `DEV_${devolucao.id}`,
-
-                        tipo:
-                            "DEVOLUCAO",
-
-                        responsavelId:
-                            devolucao.responsavelId,
-
-                        data:
-                            devolucao.data,
-
-                        titulo:
-                            "Devolução ao estoque principal",
-
-                        descricao:
-                            `${nomeResponsavel(
-                                devolucao.responsavelId
-                            )} → Estoque Principal`,
-
-                        itens,
-
-                        total:
-                            itens.reduce(
-                                (soma, item) =>
-                                    soma +
-                                    item.quantidade,
-                                0
-                            )
-                    });
-                }
-
-                for (
-                    const consumo
-                    of consumosCarrinho
-                ) {
-
-                    const itens =
-                        consumo.itens.map(
-                            (item) => ({
-                                produtoId:
-                                    item.produtoId,
-
-                                quantidade:
-                                    item.quantidade
-                            })
-                        );
-
-                    resultado.push({
-
-                        id:
-                            `CONS_${consumo.id}`,
-
-                        tipo:
-                            "CONSUMO_CARRINHO",
-
-                        responsavelId:
-                            consumo.responsavelId,
-
-                        data:
-                            consumo.data,
-
-                        titulo:
-                            "Consumo do carrinho de pipoca",
-
-                        descricao:
-                            `${nomeResponsavel(
-                                consumo.responsavelId
-                            )} → Carrinho de Pipoca`,
-
-                        itens,
-
-                        total:
-                            itens.reduce(
-                                (soma, item) =>
-                                    soma +
-                                    item.quantidade,
-                                0
-                            )
-                    });
-                }
-
-                return resultado.sort(
-                    (a, b) =>
-                        new Date(
-                            b.data
-                        ).getTime() -
-                        new Date(
-                            a.data
-                        ).getTime()
-                );
-            },
-            [
-                retiradas,
-                abastecimentos,
-                devolucoes,
-                consumosCarrinho
-            ]
-        );
-
-    const filtrados =
-        filtroResponsavel ===
-        "TODOS"
-            ? movimentos
-            : movimentos.filter(
-                (movimento) =>
-                    movimento.responsavelId ===
-                    filtroResponsavel
-            );
-
-    const positivo = (
-        tipo: TipoHistorico
-    ): boolean => {
-
-        return tipo ===
-            "ENTRADA";
-    };
-
-    const textoTipo = (
-        tipo: TipoHistorico
-    ): string => {
-
-        switch (tipo) {
-
-            case "ENTRADA":
-                return "ENTRADA";
-
-            case "ABASTECIMENTO":
-                return "ABASTECIMENTO";
-
-            case "DEVOLUCAO":
-                return "DEVOLUÇÃO";
-
-            case "CONSUMO_CARRINHO":
-                return "CONSUMO DO CARRINHO";
-        }
-    };
+export function HistoricoEstoquePessoalScreen({ retiradas, abastecimentos, devolucoes, consumosCarrinho }: Props) {
+    const [type, setType] = useState<HistoryType>("TODOS");
+    const [responsible, setResponsible] = useState<ResponsibleFilter>("TODOS");
+    const [period, setPeriod] = useState<HistoryPeriod>("TODOS");
+    const [expandedId, setExpandedId] = useState<string | null>(null);
+
+    const events = useMemo<PersonalEvent[]>(() => [
+        ...retiradas.map((item) => ({ id: `RET_${item.id}`, type: "ENTRADA" as const, responsible: item.responsavelId, date: item.data, context: "Recebido do Estoque Principal", observation: item.observacao, items: item.itens.map((detail) => ({ produtoId: detail.produtoId, quantidade: detail.quantidade })) })),
+        ...abastecimentos.map((item) => ({ id: `ABA_${item.id}`, type: "ABASTECIMENTO" as const, responsible: item.responsavelId, date: item.data, context: `Enviado para ${locationName(item.localId)}`, observation: item.observacao, items: item.itens.reduce<HistoryItem[]>((grouped, detail) => {
+            const existing = grouped.find((candidate) => candidate.produtoId === detail.produtoId);
+            if (existing) existing.quantidade += detail.quantidade;
+            else {
+                const balance = item.saldos?.find((saldo) => saldo.produtoId === detail.produtoId);
+                grouped.push({ produtoId: detail.produtoId, quantidade: detail.quantidade, anterior: balance?.saldoAnterior, posterior: balance?.saldoPosterior });
+            }
+            return grouped;
+        }, []) })),
+        ...devolucoes.map((item) => ({ id: `DEV_${item.id}`, type: "DEVOLUCAO" as const, responsible: item.responsavelId, date: item.data, context: "Devolvido ao Estoque Principal", observation: item.observacao, items: item.itens.map((detail) => ({ produtoId: detail.produtoId, quantidade: detail.quantidadeTotal ?? detail.quantidadeLivre + detail.reservas.reduce((sum, parcel) => sum + parcel.quantidade, 0), anterior: detail.saldoPessoalAnterior, posterior: detail.saldoPessoalPosterior })) })),
+        ...consumosCarrinho.map((item) => ({ id: `CONS_${item.id}`, type: "CONSUMO" as const, responsible: item.responsavelId, date: item.data, context: "Utilizado no carrinho", observation: item.observacao, items: item.itens.map((detail) => ({ produtoId: detail.produtoId, quantidade: detail.quantidade, anterior: detail.saldoAnterior, posterior: detail.saldoPosterior })) }))
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()), [retiradas, abastecimentos, devolucoes, consumosCarrinho]);
+    const filtered = events.filter((event) => type === "TODOS" || event.type === type).filter((event) => responsible === "TODOS" || event.responsible === responsible).filter((event) => isWithinHistoryPeriod(event.date, period));
 
     return (
-        <SafeAreaView
-            style={styles.container}
-        >
-
-            <ScrollView
-                contentContainerStyle={
-                    styles.conteudo
-                }
-            >
-
-                <Text
-                    style={styles.titulo}
-                >
-                    Histórico do estoque pessoal
-                </Text>
-
-                <Text
-                    style={styles.subtitulo}
-                >
-                    Controle de todas as entradas e saídas físicas
-                </Text>
-
-                <View
-                    style={styles.filtros}
-                >
-
-                    {
-                        [
-                            ["TODOS", "Todos"],
-                            [
-                                UsuarioId.RODRIGO,
-                                "Rodrigo"
-                            ],
-                            [
-                                UsuarioId.CESAR,
-                                "Cesar"
-                            ]
-                        ].map(
-                            ([valor, nome]) => (
-
-                                <TouchableOpacity
-                                    key={
-                                        valor
-                                    }
-                                    style={[
-                                        styles.filtro,
-
-                                        filtroResponsavel ===
-                                            valor &&
-                                        styles.filtroAtivo
-                                    ]}
-                                    onPress={
-                                        () =>
-                                            setFiltroResponsavel(
-                                                valor as
-                                                    UsuarioId |
-                                                    "TODOS"
-                                            )
-                                    }
-                                >
-
-                                    <Text
-                                        style={[
-                                            styles.filtroTexto,
-
-                                            filtroResponsavel ===
-                                                valor &&
-                                            styles.filtroTextoAtivo
-                                        ]}
-                                    >
-                                        {nome}
-                                    </Text>
-
-                                </TouchableOpacity>
-                            )
-                        )
-                    }
-
-                </View>
-
-                {
-                    filtrados.length ===
-                    0
-                        ? (
-                            <View
-                                style={styles.vazio}
-                            >
-                                <Text>
-                                    Nenhuma movimentação.
-                                </Text>
+        <Screen>
+            <Text style={styles.subtitle}>Entradas e saídas dos estoques de Rodrigo e Cesar.</Text>
+            <Card style={styles.filters}>
+                <HistoryFilters label="Tipo" value={type} onChange={setType} options={[{ value: "TODOS", label: "Todos" }, { value: "ENTRADA", label: "Entradas" }, { value: "ABASTECIMENTO", label: "Abastecimentos" }, { value: "DEVOLUCAO", label: "Devoluções" }, { value: "CONSUMO", label: "Carrinho" }]} />
+                <HistoryFilters label="Responsável" value={responsible} onChange={setResponsible} options={[{ value: "TODOS", label: "Todos" }, { value: UsuarioId.RODRIGO, label: "Rodrigo" }, { value: UsuarioId.CESAR, label: "Cesar" }]} />
+                <HistoryFilters label="Período" value={period} onChange={setPeriod} options={HISTORY_PERIOD_OPTIONS} />
+            </Card>
+            {filtered.length === 0 ? <Card><EmptyState title="Nenhuma movimentação encontrada" description="Tente ampliar os filtros selecionados." /></Card> : filtered.map((event) => {
+                const total = event.items.reduce((sum, item) => sum + item.quantidade, 0);
+                const expanded = expandedId === event.id;
+                return (
+                    <MovementCard key={event.id} type={typeName(event.type)} context={`${responsibleName(event.responsible)} · ${event.context}`} summary={`${total} itens em ${event.items.length} ${event.items.length === 1 ? "produto" : "produtos"}`} date={event.date} expanded={expanded} onToggle={() => setExpandedId(expanded ? null : event.id)}>
+                        {event.items.map((item) => (
+                            <View key={item.produtoId} style={styles.itemRow}>
+                                <View><Text style={styles.itemName}>{nomeProduto(item.produtoId)}</Text>{item.anterior !== undefined && item.posterior !== undefined ? <Text style={styles.balance}>Saldo {item.anterior} → {item.posterior}</Text> : null}</View>
+                                <Text style={styles.quantity}>{item.quantidade}</Text>
                             </View>
-                        )
-                        : filtrados.map(
-                            (movimento) => {
-
-                                const sinal =
-                                    positivo(
-                                        movimento.tipo
-                                    )
-                                        ? "+"
-                                        : "-";
-
-                                return (
-                                    <View
-                                        key={
-                                            movimento.id
-                                        }
-                                        style={
-                                            styles.card
-                                        }
-                                    >
-
-                                        <View
-                                            style={
-                                                styles.topo
-                                            }
-                                        >
-
-                                            <View
-                                                style={
-                                                    styles.topoInfo
-                                                }
-                                            >
-
-                                                <Text
-                                                    style={
-                                                        styles.tipo
-                                                    }
-                                                >
-                                                    {
-                                                        textoTipo(
-                                                            movimento.tipo
-                                                        )
-                                                    }
-                                                </Text>
-
-                                                <Text
-                                                    style={
-                                                        styles.cardTitulo
-                                                    }
-                                                >
-                                                    {
-                                                        movimento.titulo
-                                                    }
-                                                </Text>
-
-                                            </View>
-
-                                            <Text
-                                                style={
-                                                    styles.total
-                                                }
-                                            >
-                                                {sinal}{
-                                                    movimento.total
-                                                }
-                                            </Text>
-
-                                        </View>
-
-                                        <Text
-                                            style={
-                                                styles.descricao
-                                            }
-                                        >
-                                            {
-                                                movimento.descricao
-                                            }
-                                        </Text>
-
-                                        <Text
-                                            style={
-                                                styles.data
-                                            }
-                                        >
-                                            {
-                                                new Date(
-                                                    movimento.data
-                                                ).toLocaleString(
-                                                    "pt-BR"
-                                                )
-                                            }
-                                        </Text>
-
-                                        <View
-                                            style={
-                                                styles.itens
-                                            }
-                                        >
-
-                                            {
-                                                movimento.itens.map(
-                                                    (item) => (
-
-                                                        <View
-                                                            key={
-                                                                item.produtoId
-                                                            }
-                                                            style={
-                                                                styles.item
-                                                            }
-                                                        >
-
-                                                            <Text>
-                                                                {
-                                                                    nomeProduto(
-                                                                        item.produtoId
-                                                                    )
-                                                                }
-                                                            </Text>
-
-                                                            <Text
-                                                                style={
-                                                                    styles.itemQuantidade
-                                                                }
-                                                            >
-                                                                {sinal}{
-                                                                    item.quantidade
-                                                                }
-                                                            </Text>
-
-                                                        </View>
-                                                    )
-                                                )
-                                            }
-
-                                        </View>
-
-                                    </View>
-                                );
-                            }
-                        )
-                }
-
-            </ScrollView>
-
-        </SafeAreaView>
+                        ))}
+                        {event.observation ? <Text style={styles.note}>Observação: {event.observation}</Text> : null}
+                    </MovementCard>
+                );
+            })}
+        </Screen>
     );
 }
 
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            backgroundColor: "#F5F5F5"
-        },
-
-        conteudo: {
-            padding: 20,
-            paddingBottom: 60
-        },
-
-        titulo: {
-            fontSize: 28,
-            fontWeight: "800"
-        },
-
-        subtitulo: {
-            color: "#666666",
-            marginTop: 4,
-            marginBottom: 20
-        },
-
-        filtros: {
-            flexDirection: "row",
-            gap: 8,
-            marginBottom: 20
-        },
-
-        filtro: {
-            flex: 1,
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#DDDDDD",
-            borderRadius: 10,
-            padding: 10,
-            alignItems: "center"
-        },
-
-        filtroAtivo: {
-            backgroundColor: "#111111",
-            borderColor: "#111111"
-        },
-
-        filtroTexto: {
-            fontWeight: "700"
-        },
-
-        filtroTextoAtivo: {
-            color: "#FFFFFF"
-        },
-
-        card: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 14,
-            padding: 16,
-            marginBottom: 12
-        },
-
-        topo: {
-            flexDirection: "row",
-            justifyContent: "space-between"
-        },
-
-        topoInfo: {
-            flex: 1
-        },
-
-        tipo: {
-            fontSize: 11,
-            fontWeight: "800",
-            color: "#777777"
-        },
-
-        cardTitulo: {
-            fontSize: 17,
-            fontWeight: "800",
-            marginTop: 3
-        },
-
-        total: {
-            fontSize: 23,
-            fontWeight: "800"
-        },
-
-        descricao: {
-            marginTop: 8,
-            fontWeight: "600"
-        },
-
-        data: {
-            color: "#777777",
-            fontSize: 12,
-            marginTop: 4
-        },
-
-        itens: {
-            borderTopWidth: 1,
-            borderTopColor: "#EEEEEE",
-            marginTop: 12,
-            paddingTop: 10
-        },
-
-        item: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            marginBottom: 7
-        },
-
-        itemQuantidade: {
-            fontWeight: "800"
-        },
-
-        vazio: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 14,
-            padding: 20,
-            alignItems: "center"
-        }
-    });
+const styles = StyleSheet.create({
+    subtitle: { ...Typography.body, color: Palette.textSecondary, marginBottom: Spacing.three },
+    filters: { paddingBottom: Spacing.one, marginBottom: Spacing.three },
+    itemRow: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: Palette.border },
+    itemName: { ...Typography.label, color: Palette.text, fontWeight: "600" },
+    balance: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    quantity: { ...Typography.cardTitle, color: Palette.text },
+    note: { ...Typography.label, color: Palette.text, marginTop: Spacing.compact }
+});

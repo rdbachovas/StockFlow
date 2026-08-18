@@ -5,19 +5,32 @@ import React, {
 } from "react";
 
 import {
-    ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View
 } from "react-native";
 
+import { useRouter } from "expo-router";
+
+import { ProductStockRow } from "../components/domain/ProductStockRow";
+import { Screen } from "../components/layout/Screen";
+import { Section } from "../components/layout/Section";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Chip } from "../components/ui/Chip";
+import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import {
+    ControlSize,
+    Palette,
+    Radius,
+    Spacing,
+    Typography
+} from "../constants/theme";
 import { Estoque } from "../models/Estoque";
 import { ProdutoId } from "../models/Produto";
 import { RetiradaEstoque } from "../models/RetiradaEstoque";
 import { UsuarioId } from "../models/Usuario";
-
 import {
     nomeProduto,
     PRODUTOS_CARRINHO,
@@ -25,17 +38,16 @@ import {
 } from "../utils/ProdutoUtils";
 
 interface Props {
-
     estoquePrincipal: Estoque;
-
     estoqueRodrigo: Estoque;
-
     estoqueCesar: Estoque;
+    registrarRetirada: (retirada: RetiradaEstoque) => Promise<void>;
+}
 
-    registrarRetirada:
-        (
-            retirada: RetiradaEstoque
-        ) => Promise<void>;
+type ProductGroup = "PELUCIAS" | "CARRINHO";
+
+function stockQuantity(stock: Estoque, productId: ProdutoId): number {
+    return stock.itens.find((item) => item.produtoId === productId)?.quantidade ?? 0;
 }
 
 export function EstoquePrincipalScreen({
@@ -44,678 +56,223 @@ export function EstoquePrincipalScreen({
     estoqueCesar,
     registrarRetirada
 }: Props) {
+    const router = useRouter();
+    const sendingRef = useRef(false);
+    const [withdrawing, setWithdrawing] = useState(false);
+    const [group, setGroup] = useState<ProductGroup>("PELUCIAS");
+    const [responsible, setResponsible] = useState<UsuarioId>(UsuarioId.RODRIGO);
+    const [quantities, setQuantities] = useState<Record<string, string>>({});
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState<string | null>(null);
+    const [sending, setSending] = useState(false);
 
-    const [
-        responsavel,
-        setResponsavel
-    ] = useState<UsuarioId>(
-        UsuarioId.RODRIGO
+    const plushTotal = PRODUTOS_PELUCIAS.reduce(
+        (total, productId) => total + stockQuantity(estoquePrincipal, productId),
+        0
+    );
+    const cartTotal = PRODUTOS_CARRINHO.reduce(
+        (total, productId) => total + stockQuantity(estoquePrincipal, productId),
+        0
+    );
+    const visibleProducts = group === "PELUCIAS" ? PRODUTOS_PELUCIAS : PRODUTOS_CARRINHO;
+    const allProducts = [...PRODUTOS_PELUCIAS, ...PRODUTOS_CARRINHO];
+
+    const withdrawalItems = useMemo(
+        () => allProducts
+            .map((productId) => ({
+                produtoId: productId,
+                quantidade: Number(quantities[productId] || 0)
+            }))
+            .filter((item) => item.quantidade > 0),
+        [quantities]
     );
 
-    const [
-        quantidades,
-        setQuantidades
-    ] = useState<
-        Record<string, string>
-    >({});
+    const withdrawalTotal = withdrawalItems.reduce(
+        (total, item) => total + item.quantidade,
+        0
+    );
 
-    const [
-        sucesso,
-        setSucesso
-    ] = useState<
-        string | null
-    >(null);
+    const changeQuantity = (productId: ProdutoId, value: string) => {
+        setQuantities((current) => ({
+            ...current,
+            [productId]: value.replace(/[^0-9]/g, "")
+        }));
+        setError(null);
+        setSuccess(null);
+    };
 
-    const [
-        erro,
-        setErro
-    ] = useState<
-        string | null
-    >(null);
+    const confirm = async () => {
+        if (sendingRef.current) {
+            return;
+        }
 
-    const [
-        enviando,
-        setEnviando
-    ] = useState(false);
+        setError(null);
+        setSuccess(null);
 
-    const enviandoRef = useRef(false);
+        if (withdrawalItems.length === 0) {
+            setError("Informe pelo menos uma quantidade.");
+            return;
+        }
 
-    const estoqueDestino =
-        responsavel ===
-            UsuarioId.RODRIGO
+        const destination = responsible === UsuarioId.RODRIGO
             ? estoqueRodrigo
             : estoqueCesar;
 
-    const quantidadePrincipal = (
-        produtoId: ProdutoId
-    ): number => {
-
-        return (
-            estoquePrincipal.itens.find(
-                (item) =>
-                    item.produtoId ===
-                    produtoId
-            )?.quantidade ?? 0
-        );
-    };
-
-    const itensRetirada =
-        useMemo(
-            () => {
-
-                return [
-                    ...PRODUTOS_PELUCIAS,
-                    ...PRODUTOS_CARRINHO
-                ]
-                    .map(
-                        (produtoId) => ({
-                            produtoId,
-
-                            quantidade:
-                                Number(
-                                    quantidades[
-                                        produtoId
-                                    ] || 0
-                                )
-                        })
-                    )
-                    .filter(
-                        (item) =>
-                            item.quantidade > 0
-                    );
-            },
-            [quantidades]
-        );
-
-    const totalRetirada =
-        useMemo(
-            () => {
-
-                return itensRetirada.reduce(
-                    (total, item) =>
-                        total +
-                        item.quantidade,
-                    0
-                );
-            },
-            [itensRetirada]
-        );
-
-    const alterarQuantidade = (
-        produtoId: ProdutoId,
-        valor: string
-    ) => {
-
-        setQuantidades(
-            (anterior) => ({
-                ...anterior,
-
-                [produtoId]:
-                    valor.replace(
-                        /[^0-9]/g,
-                        ""
-                    )
-            })
-        );
-
-        setErro(null);
-        setSucesso(null);
-    };
-
-    const confirmar =
-        async () => {
-
-            if (enviandoRef.current) {
-                return;
-            }
-
-            setErro(null);
-            setSucesso(null);
-
-            if (
-                itensRetirada.length === 0
-            ) {
-
-                setErro(
-                    "Informe pelo menos uma quantidade."
-                );
-
-                return;
-            }
-
-            const retirada:
-                RetiradaEstoque = {
-
-                id:
-                    `RET_${Date.now()}`,
-
-                estoqueOrigemId:
-                    estoquePrincipal.id,
-
-                estoqueDestinoId:
-                    estoqueDestino.id,
-
-                responsavelId:
-                    responsavel,
-
-                itens:
-                    itensRetirada,
-
-                data:
-                    new Date()
-            };
-
-            try {
-
-                enviandoRef.current = true;
-                setEnviando(true);
-
-                await registrarRetirada(
-                    retirada
-                );
-
-                setQuantidades({});
-
-                setSucesso(
-                    `${totalRetirada} itens enviados para ${responsavel === UsuarioId.RODRIGO ? "Rodrigo" : "Cesar"}.`
-                );
-
-            } catch (e) {
-
-                setErro(
-                    e instanceof Error
-                        ? e.message
-                        : "Erro ao registrar retirada."
-                );
-            } finally {
-                enviandoRef.current = false;
-                setEnviando(false);
-            }
+        const withdrawal: RetiradaEstoque = {
+            id: `RET_${Date.now()}`,
+            estoqueOrigemId: estoquePrincipal.id,
+            estoqueDestinoId: destination.id,
+            responsavelId: responsible,
+            itens: withdrawalItems,
+            data: new Date()
         };
 
-    const renderGrupo = (
-        titulo: string,
-        descricao: string,
-        produtos: ProdutoId[]
-    ) => {
-
-        return (
-            <View
-                style={styles.grupo}
-            >
-
-                <Text
-                    style={styles.grupoTitulo}
-                >
-                    {titulo}
-                </Text>
-
-                <Text
-                    style={styles.grupoDescricao}
-                >
-                    {descricao}
-                </Text>
-
-                {
-                    produtos.map(
-                        (produtoId) => {
-
-                            const atual =
-                                quantidadePrincipal(
-                                    produtoId
-                                );
-
-                            const retirada =
-                                Number(
-                                    quantidades[
-                                        produtoId
-                                    ] || 0
-                                );
-
-                            const projetado =
-                                atual -
-                                retirada;
-
-                            return (
-                                <View
-                                    key={
-                                        produtoId
-                                    }
-                                    style={
-                                        styles.cardProduto
-                                    }
-                                >
-
-                                    <View
-                                        style={
-                                            styles.produtoInfo
-                                        }
-                                    >
-
-                                        <Text
-                                            style={
-                                                styles.produtoNome
-                                            }
-                                        >
-                                            {
-                                                nomeProduto(
-                                                    produtoId
-                                                )
-                                            }
-                                        </Text>
-
-                                        <Text
-                                            style={
-                                                styles.produtoSaldo
-                                            }
-                                        >
-                                            Principal: {atual}
-                                        </Text>
-
-                                        {
-                                            retirada > 0
-                                                ? (
-                                                    <Text
-                                                        style={[
-                                                            styles.projecao,
-
-                                                            projetado < 0 &&
-                                                            styles.negativo
-                                                        ]}
-                                                    >
-                                                        Depois: {projetado}
-                                                    </Text>
-                                                )
-                                                : null
-                                        }
-
-                                    </View>
-
-                                    <TextInput
-                                        style={
-                                            styles.input
-                                        }
-
-                                        value={
-                                            quantidades[
-                                                produtoId
-                                            ] ?? ""
-                                        }
-
-                                        onChangeText={
-                                            (valor) =>
-                                                alterarQuantidade(
-                                                    produtoId,
-                                                    valor
-                                                )
-                                        }
-
-                                        keyboardType="number-pad"
-
-                                        placeholder="0"
-                                    />
-
-                                </View>
-                            );
-                        }
-                    )
-                }
-
-            </View>
-        );
+        try {
+            sendingRef.current = true;
+            setSending(true);
+            await registrarRetirada(withdrawal);
+            setQuantities({});
+            setSuccess(`${withdrawalTotal} itens enviados para ${responsible === UsuarioId.RODRIGO ? "Rodrigo" : "Cesar"}.`);
+        } catch (caughtError) {
+            setError(caughtError instanceof Error ? caughtError.message : "Erro ao registrar retirada.");
+        } finally {
+            sendingRef.current = false;
+            setSending(false);
+        }
     };
 
+    if (withdrawing) {
+        return (
+            <Screen>
+                <Button
+                    label="Voltar para consulta"
+                    variant="ghost"
+                    onPress={() => setWithdrawing(false)}
+                    style={styles.backButton}
+                />
+                <Text style={styles.formTitle}>Retirar produtos</Text>
+                <Text style={styles.subtitle}>Transfira itens do Principal para um estoque pessoal.</Text>
+
+                <Section title="Destino">
+                    <View style={styles.chips}>
+                        <Chip label="Rodrigo" selected={responsible === UsuarioId.RODRIGO} onPress={() => setResponsible(UsuarioId.RODRIGO)} />
+                        <Chip label="Cesar" selected={responsible === UsuarioId.CESAR} onPress={() => setResponsible(UsuarioId.CESAR)} />
+                    </View>
+                </Section>
+
+                <Section title="Produtos" description="Informe somente as quantidades que serão retiradas.">
+                    {([
+                        { title: "Pelúcias", products: PRODUTOS_PELUCIAS },
+                        { title: "Carrinho", products: PRODUTOS_CARRINHO }
+                    ] as const).map((section) => (
+                        <Card key={section.title} style={styles.formGroup}>
+                            <Text style={styles.groupTitle}>{section.title}</Text>
+                            {section.products.map((productId) => {
+                                const current = stockQuantity(estoquePrincipal, productId);
+                                const requested = Number(quantities[productId] || 0);
+                                return (
+                                    <View key={productId} style={styles.inputRow}>
+                                        <View style={styles.productInfo}>
+                                            <Text style={styles.productName}>{nomeProduto(productId)}</Text>
+                                            <Text style={styles.productBalance}>
+                                                Saldo {current}{requested > 0 ? ` · Depois ${current - requested}` : ""}
+                                            </Text>
+                                        </View>
+                                        <TextInput
+                                            accessibilityLabel={`Quantidade de ${nomeProduto(productId)}`}
+                                            style={styles.input}
+                                            value={quantities[productId] ?? ""}
+                                            onChangeText={(value) => changeQuantity(productId, value)}
+                                            keyboardType="number-pad"
+                                            placeholder="0"
+                                            placeholderTextColor={Palette.disabled}
+                                        />
+                                    </View>
+                                );
+                            })}
+                        </Card>
+                    ))}
+                </Section>
+
+                <Card style={styles.totalCard}>
+                    <Text style={styles.totalLabel}>Total da retirada</Text>
+                    <Text style={styles.totalValue}>{withdrawalTotal}</Text>
+                </Card>
+                {error ? <FeedbackBanner title="Não foi possível retirar" message={error} variant="danger" /> : null}
+                {success ? <FeedbackBanner title="Retirada registrada" message={success} /> : null}
+                <Button label="Confirmar retirada" onPress={confirm} loading={sending} style={styles.confirmButton} />
+            </Screen>
+        );
+    }
+
     return (
-        <ScrollView
-            style={styles.container}
-            contentContainerStyle={
-                styles.conteudo
-            }
-        >
+        <Screen>
+            <Text style={styles.subtitle}>Consulte os saldos físicos do estoque central.</Text>
 
-            <Text
-                style={styles.titulo}
-            >
-                Estoque Principal
-            </Text>
+            <Card style={styles.summary}>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{plushTotal + cartTotal}</Text>
+                    <Text style={styles.summaryLabel}>Total</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{plushTotal}</Text>
+                    <Text style={styles.summaryLabel}>Pelúcias</Text>
+                </View>
+                <View style={styles.summaryItem}>
+                    <Text style={styles.summaryValue}>{cartTotal}</Text>
+                    <Text style={styles.summaryLabel}>Carrinho</Text>
+                </View>
+            </Card>
 
-            <Text
-                style={styles.subtitulo}
-            >
-                Retire produtos do estoque central e transfira para um estoque pessoal
-            </Text>
+            <Section title="Produtos">
+                <View style={styles.chips}>
+                    <Chip label="Pelúcias" selected={group === "PELUCIAS"} onPress={() => setGroup("PELUCIAS")} />
+                    <Chip label="Carrinho" selected={group === "CARRINHO"} onPress={() => setGroup("CARRINHO")} />
+                </View>
+                <Card style={styles.productList}>
+                    {visibleProducts.map((productId) => (
+                        <ProductStockRow
+                            key={productId}
+                            productName={nomeProduto(productId)}
+                            quantity={stockQuantity(estoquePrincipal, productId)}
+                            detail="Saldo físico"
+                        />
+                    ))}
+                </Card>
+            </Section>
 
-            <Text
-                style={styles.secaoTitulo}
-            >
-                Quem está retirando?
-            </Text>
-
-            <View
-                style={styles.seletor}
-            >
-
-                <TouchableOpacity
-                    style={[
-                        styles.opcao,
-
-                        responsavel ===
-                            UsuarioId.RODRIGO &&
-                        styles.opcaoAtiva
-                    ]}
-                    onPress={
-                        () => {
-                            setResponsavel(
-                                UsuarioId.RODRIGO
-                            );
-
-                            setQuantidades({});
-                            setErro(null);
-                            setSucesso(null);
-                        }
-                    }
-                >
-                    <Text
-                        style={[
-                            styles.opcaoTexto,
-
-                            responsavel ===
-                                UsuarioId.RODRIGO &&
-                            styles.opcaoTextoAtivo
-                        ]}
-                    >
-                        Rodrigo
-                    </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[
-                        styles.opcao,
-
-                        responsavel ===
-                            UsuarioId.CESAR &&
-                        styles.opcaoAtiva
-                    ]}
-                    onPress={
-                        () => {
-                            setResponsavel(
-                                UsuarioId.CESAR
-                            );
-
-                            setQuantidades({});
-                            setErro(null);
-                            setSucesso(null);
-                        }
-                    }
-                >
-                    <Text
-                        style={[
-                            styles.opcaoTexto,
-
-                            responsavel ===
-                                UsuarioId.CESAR &&
-                            styles.opcaoTextoAtivo
-                        ]}
-                    >
-                        Cesar
-                    </Text>
-                </TouchableOpacity>
-
-            </View>
-
-            {
-                renderGrupo(
-                    "🧸 Pelúcias",
-                    "Produtos utilizados nas máquinas",
-                    PRODUTOS_PELUCIAS
-                )
-            }
-
-            {
-                renderGrupo(
-                    "🍿 Carrinho de Pipoca",
-                    "Insumos que podem ficar com Rodrigo ou Cesar",
-                    PRODUTOS_CARRINHO
-                )
-            }
-
-            <View
-                style={styles.totalCard}
-            >
-                <Text>
-                    Total da retirada
-                </Text>
-
-                <Text
-                    style={styles.total}
-                >
-                    {totalRetirada}
-                </Text>
-            </View>
-
-            {
-                erro
-                    ? (
-                        <View
-                            style={styles.erro}
-                        >
-                            <Text>
-                                {erro}
-                            </Text>
-                        </View>
-                    )
-                    : null
-            }
-
-            {
-                sucesso
-                    ? (
-                        <View
-                            style={styles.sucesso}
-                        >
-                            <Text
-                                style={styles.sucessoTitulo}
-                            >
-                                ✓ Retirada registrada
-                            </Text>
-
-                            <Text>
-                                {sucesso}
-                            </Text>
-                        </View>
-                    )
-                    : null
-            }
-
-            <TouchableOpacity
-                style={[
-                    styles.botao,
-                    enviando && styles.botaoDesabilitado
-                ]}
-                onPress={
-                    confirmar
-                }
-                disabled={enviando}
-            >
-                <Text
-                    style={styles.botaoTexto}
-                >
-                    {enviando ? "Enviando..." : "Confirmar retirada"}
-                </Text>
-            </TouchableOpacity>
-
-        </ScrollView>
+            <Section title="Ações">
+                <Button label="Retirar produtos" onPress={() => setWithdrawing(true)} />
+                <View style={styles.secondaryActions}>
+                    <Button label="Entrada / Ajuste" variant="secondary" onPress={() => router.push("/ajuste-estoque-principal")} style={styles.secondaryButton} />
+                    <Button label="Histórico" variant="secondary" onPress={() => router.push("/historico-estoque-principal")} style={styles.secondaryButton} />
+                </View>
+            </Section>
+        </Screen>
     );
 }
 
-const styles =
-    StyleSheet.create({
-
-        container: {
-            flex: 1,
-            backgroundColor: "#F5F5F5"
-        },
-
-        conteudo: {
-            padding: 20,
-            paddingBottom: 60
-        },
-
-        titulo: {
-            fontSize: 30,
-            fontWeight: "800"
-        },
-
-        subtitulo: {
-            color: "#666666",
-            marginTop: 4,
-            marginBottom: 24,
-            lineHeight: 20
-        },
-
-        secaoTitulo: {
-            fontSize: 19,
-            fontWeight: "700",
-            marginBottom: 10
-        },
-
-        seletor: {
-            flexDirection: "row",
-            gap: 10,
-            marginBottom: 28
-        },
-
-        opcao: {
-            flex: 1,
-            backgroundColor: "#FFFFFF",
-            borderWidth: 1,
-            borderColor: "#DDDDDD",
-            borderRadius: 12,
-            padding: 13,
-            alignItems: "center"
-        },
-
-        opcaoAtiva: {
-            backgroundColor: "#111111",
-            borderColor: "#111111"
-        },
-
-        opcaoTexto: {
-            fontWeight: "700"
-        },
-
-        opcaoTextoAtivo: {
-            color: "#FFFFFF"
-        },
-
-        grupo: {
-            marginBottom: 26
-        },
-
-        grupoTitulo: {
-            fontSize: 21,
-            fontWeight: "800"
-        },
-
-        grupoDescricao: {
-            fontSize: 13,
-            color: "#666666",
-            marginTop: 3,
-            marginBottom: 12
-        },
-
-        cardProduto: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 9,
-            flexDirection: "row",
-            alignItems: "center"
-        },
-
-        produtoInfo: {
-            flex: 1
-        },
-
-        produtoNome: {
-            fontSize: 16,
-            fontWeight: "700"
-        },
-
-        produtoSaldo: {
-            color: "#666666",
-            fontSize: 13,
-            marginTop: 3
-        },
-
-        projecao: {
-            fontSize: 12,
-            fontWeight: "600",
-            marginTop: 3
-        },
-
-        negativo: {
-            color: "#B00020"
-        },
-
-        input: {
-            width: 90,
-            borderWidth: 1,
-            borderColor: "#CCCCCC",
-            borderRadius: 9,
-            padding: 10,
-            textAlign: "center",
-            fontSize: 18
-        },
-
-        totalCard: {
-            backgroundColor: "#FFFFFF",
-            borderRadius: 12,
-            padding: 16,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 14
-        },
-
-        total: {
-            fontSize: 26,
-            fontWeight: "800"
-        },
-
-        erro: {
-            backgroundColor: "#FFEBEE",
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 14
-        },
-
-        sucesso: {
-            backgroundColor: "#E8F5E9",
-            borderRadius: 12,
-            padding: 14,
-            marginBottom: 14
-        },
-
-        sucessoTitulo: {
-            fontWeight: "700",
-            marginBottom: 4
-        },
-
-        botao: {
-            backgroundColor: "#111111",
-            borderRadius: 12,
-            padding: 16,
-            alignItems: "center"
-        },
-
-        botaoDesabilitado: {
-            opacity: 0.6
-        },
-
-        botaoTexto: {
-            color: "#FFFFFF",
-            fontSize: 17,
-            fontWeight: "700"
-        }
-    });
+const styles = StyleSheet.create({
+    backButton: { alignSelf: "flex-start", marginLeft: -Spacing.three },
+    formTitle: { ...Typography.screenTitle, color: Palette.text, marginTop: Spacing.two },
+    subtitle: { ...Typography.body, color: Palette.textSecondary },
+    summary: { flexDirection: "row", marginTop: Spacing.three },
+    summaryItem: { flex: 1, alignItems: "center" },
+    summaryValue: { fontSize: 24, lineHeight: 30, fontWeight: "700", color: Palette.text },
+    summaryLabel: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    chips: { flexDirection: "row", gap: Spacing.two, marginBottom: Spacing.compact },
+    productList: { paddingVertical: 0 },
+    secondaryActions: { flexDirection: "row", gap: Spacing.two, marginTop: Spacing.two },
+    secondaryButton: { flex: 1 },
+    formGroup: { paddingVertical: Spacing.two, marginBottom: Spacing.compact },
+    groupTitle: { ...Typography.cardTitle, color: Palette.text, paddingVertical: Spacing.two },
+    inputRow: { minHeight: 64, flexDirection: "row", alignItems: "center", borderTopWidth: 1, borderTopColor: Palette.border },
+    productInfo: { flex: 1, paddingRight: Spacing.two },
+    productName: { ...Typography.body, color: Palette.text, fontWeight: "600" },
+    productBalance: { ...Typography.caption, color: Palette.textSecondary, marginTop: Spacing.half },
+    input: { width: 68, height: ControlSize.input, borderRadius: Radius.small, borderWidth: 1, borderColor: Palette.border, backgroundColor: Palette.background, color: Palette.text, textAlign: "center", fontSize: 16, fontWeight: "700" },
+    totalCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Spacing.compact, marginBottom: Spacing.compact },
+    totalLabel: { ...Typography.body, color: Palette.text },
+    totalValue: { fontSize: 24, fontWeight: "700", color: Palette.primary },
+    confirmButton: { marginTop: Spacing.compact }
+});
