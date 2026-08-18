@@ -2,6 +2,7 @@ package br.com.stockflow;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +46,7 @@ class MovimentoEstoquePrincipalIntegrationTest {
 
     @BeforeEach
     void prepararEstado() {
+        jdbcTemplate.update("UPDATE revisao_estado SET revisao = 0 WHERE id = 1");
         jdbcTemplate.update("DELETE FROM movimento_estoque_principal_itens");
         jdbcTemplate.update("DELETE FROM movimentos_estoque_principal");
         jdbcTemplate.update("""
@@ -62,8 +64,39 @@ class MovimentoEstoquePrincipalIntegrationTest {
     @Test
     void registraEntradaValida() throws Exception {
         movimentar("ENTRADA", item("MIX", 20))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").value(1));
         assertThat(saldo("MIX")).isEqualTo(320);
+    }
+
+    @Test
+    void revisaoComecaEmZeroECresceComOperacoesConfirmadas() throws Exception {
+        mockMvc.perform(get("/api/v1/snapshot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revisao").value(0));
+
+        movimentar("ENTRADA", item("MIX", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").value(1));
+        movimentar("SAIDA", item("MIX", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").value(2));
+
+        mockMvc.perform(get("/api/v1/snapshot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revisao").value(2))
+                .andExpect(jsonPath("$.estoques[?(@.id == 'ESTOQUE_PRINCIPAL')].itens[?(@.produtoId == 'MIX')].quantidade")
+                        .value(300));
+    }
+
+    @Test
+    void operacaoRejeitadaNaoAvancaRevisao() throws Exception {
+        movimentar("SAIDA", item("MILHO", 51))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/snapshot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revisao").value(0));
     }
 
     @Test

@@ -34,6 +34,7 @@ function movimento(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             {
                 id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null,
@@ -61,7 +62,7 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(oficial = snapshot()): void {
-    jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal").mockResolvedValue({ id: "movimento-oficial" });
+    jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal").mockResolvedValue({ id: "movimento-oficial", revisao: 1 });
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
@@ -169,7 +170,7 @@ describe("movimento remoto do Estoque Principal", () => {
         const post = jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal")
             .mockImplementation(async () => {
                 await pendente;
-                return { id: "movimento-oficial" };
+                return { id: "movimento-oficial", revisao: 1 };
             });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();

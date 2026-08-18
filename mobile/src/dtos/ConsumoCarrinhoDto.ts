@@ -11,5 +11,6 @@ export interface RegistrarConsumoCarrinhoRequestDto {
 }
 
 export interface RegistrarConsumoCarrinhoResponseDto {
+    revisao: number;
     id: string;
 }

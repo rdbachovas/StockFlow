@@ -32,6 +32,7 @@ function abastecimento(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [] },
             {
@@ -65,7 +66,7 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(): void {
-    jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({} as never);
+    jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({ revisao: 1 } as never);
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
@@ -126,7 +127,7 @@ describe("abastecimento remoto", () => {
         oficial.abastecimentos[0].local = "SUPERMERCADO_FANTE";
         oficial.abastecimentos[0].itens[0].maquinaId = "SUPERMERCADO_FANTE";
         oficial.reservas[0].destino = "MERCADOS";
-        jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
@@ -225,7 +226,7 @@ describe("abastecimento remoto", () => {
         let concluir!: () => void;
         const espera = new Promise<void>((resolve) => { concluir = resolve; });
         const post = jest.spyOn(ApiService, "registrarAbastecimento")
-            .mockImplementation(async () => { await espera; return {} as never; });
+            .mockImplementation(async () => { await espera; return { revisao: 1 } as never; });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
         const primeira = AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");

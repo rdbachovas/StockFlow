@@ -26,6 +26,7 @@ jest.mock(
 
 function snapshotValido(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [{ produtoId: "MIX", nome: "Mix", grupo: "PELUCIA", quantidade: 9 }] },
             { id: "ESTOQUE_RODRIGO", nome: "Rodrigo", responsavelId: "RODRIGO", itens: [] },
@@ -72,6 +73,21 @@ describe("inicialização pelo snapshot", () => {
 
         expect(dados.reservas[0].dataCriacao).toBeInstanceOf(Date);
         expect(dados.reservas[0].historico?.[0].data).toBeInstanceOf(Date);
+        expect(dados.revisaoServidor).toBe(1);
+    });
+
+    test("snapshot menor que o cache é descartado", async () => {
+        const cache = criarDadosIniciais();
+        cache.revisaoServidor = 2;
+        jest.spyOn(PersistenceService, "carregar").mockResolvedValue({ tipo: "VALIDO", dados: cache });
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshotValido());
+        const salvar = jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        const resultado = await InicializacaoService.carregar();
+
+        expect(resultado.dados).toBe(cache);
+        expect(resultado.estadoSincronizacao).toBe("DESATUALIZADO");
+        expect(salvar).not.toHaveBeenCalled();
     });
 
     test("backend indisponível mantém cache", async () => {

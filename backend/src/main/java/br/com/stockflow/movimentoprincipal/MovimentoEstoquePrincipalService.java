@@ -6,6 +6,7 @@ import java.util.Map;
 
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,13 +17,16 @@ public class MovimentoEstoquePrincipalService {
 
     private final EstoqueItemRepository estoqueItemRepository;
     private final MovimentoEstoquePrincipalRepository movimentoRepository;
+    private final RevisaoService revisaoService;
 
     public MovimentoEstoquePrincipalService(
             EstoqueItemRepository estoqueItemRepository,
-            MovimentoEstoquePrincipalRepository movimentoRepository
+            MovimentoEstoquePrincipalRepository movimentoRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueItemRepository = estoqueItemRepository;
         this.movimentoRepository = movimentoRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -64,7 +68,8 @@ public class MovimentoEstoquePrincipalService {
         }
 
         return MovimentoEstoquePrincipalResponse.de(
-                movimentoRepository.save(movimento)
+                movimentoRepository.save(movimento),
+                revisaoService.avancar()
         );
     }
 

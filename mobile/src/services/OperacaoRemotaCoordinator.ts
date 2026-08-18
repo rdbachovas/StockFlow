@@ -29,8 +29,18 @@ type AtualizarEstado = (estado: EstadoSincronizacao) => void;
 
 export class OperacaoRemotaCoordinator {
     private static fila: Promise<void> = Promise.resolve();
-    private static snapshotPendente = false;
+    private static revisaoMinimaPendente: number | undefined;
+    private static maiorRevisaoAplicada = 0;
     private static operacoesEmEspera = new Set<string>();
+
+    static registrarRevisaoAplicada(revisao: number): void {
+        if (Number.isInteger(revisao) && revisao >= 0) {
+            this.maiorRevisaoAplicada = Math.max(
+                this.maiorRevisaoAplicada,
+                revisao
+            );
+        }
+    }
 
     private static enfileirar<T>(tarefa: () => Promise<T>): Promise<T> {
         const resultado = this.fila.then(tarefa, tarefa);
@@ -44,7 +54,7 @@ export class OperacaoRemotaCoordinator {
         atualizarEstado?: AtualizarEstado
     ): Promise<ResultadoOperacao> {
         return this.enfileirar(async () => {
-            if (this.snapshotPendente) {
+            if (this.revisaoMinimaPendente !== undefined) {
                 atualizarEstado?.("DESATUALIZADO");
                 return {
                     tipo: "REJEITADA",
@@ -61,8 +71,10 @@ export class OperacaoRemotaCoordinator {
 
             atualizarEstado?.("SINCRONIZANDO");
 
+            let respostaPost: unknown;
+
             try {
-                await post();
+                respostaPost = await post();
             } catch (erro) {
                 atualizarEstado?.(
                     erro instanceof ErroApi && erro.status === undefined
@@ -75,6 +87,23 @@ export class OperacaoRemotaCoordinator {
                 };
             }
 
+            let revisaoPost: number;
+
+            try {
+                revisaoPost = this.obterRevisao(respostaPost);
+            } catch (erro) {
+                this.revisaoMinimaPendente = this.maiorRevisaoAplicada;
+                atualizarEstado?.("DESATUALIZADO");
+                return {
+                    tipo: "CONFIRMADA_PENDENTE_SNAPSHOT",
+                    erro: erro instanceof Error ? erro : new Error("Resposta confirmada sem revisão válida.")
+                };
+            }
+
+            this.revisaoMinimaPendente = Math.max(
+                revisaoPost,
+                this.maiorRevisaoAplicada
+            );
             return await this.sincronizarAposConfirmacao(atualizarEstado);
         });
     }
@@ -113,7 +142,7 @@ export class OperacaoRemotaCoordinator {
         atualizarEstado?: AtualizarEstado
     ): Promise<ResultadoOperacao> {
         return this.enfileirar(async () => {
-            if (!this.snapshotPendente) {
+            if (this.revisaoMinimaPendente === undefined) {
                 return {
                     tipo: "REJEITADA",
                     erro: new Error("Não existe sincronização pendente.")
@@ -132,9 +161,18 @@ export class OperacaoRemotaCoordinator {
 
         try {
             const snapshot = await ApiService.obterSnapshot();
+            const revisaoMinima = Math.max(
+                this.revisaoMinimaPendente ?? 0,
+                this.maiorRevisaoAplicada
+            );
+
+            if (snapshot.revisao < revisaoMinima) {
+                throw new Error(
+                    `Snapshot desatualizado: revisão ${snapshot.revisao}; esperada ao menos ${revisaoMinima}.`
+                );
+            }
             dados = SnapshotMapper.paraDadosIniciais(snapshot);
         } catch (erro) {
-            this.snapshotPendente = true;
             atualizarEstado?.("DESATUALIZADO");
             return {
                 tipo: "CONFIRMADA_PENDENTE_SNAPSHOT",
@@ -142,7 +180,11 @@ export class OperacaoRemotaCoordinator {
             };
         }
 
-        this.snapshotPendente = false;
+        this.revisaoMinimaPendente = undefined;
+        this.maiorRevisaoAplicada = Math.max(
+            this.maiorRevisaoAplicada,
+            dados.revisaoServidor
+        );
 
         try {
             await PersistenceService.salvar(dados);
@@ -161,5 +203,20 @@ export class OperacaoRemotaCoordinator {
                 erroCache: erro instanceof Error ? erro : new Error("Não foi possível atualizar o cache.")
             };
         }
+    }
+
+    private static obterRevisao(resposta: unknown): number {
+        if (
+            typeof resposta !== "object" ||
+            resposta === null ||
+            !("revisao" in resposta) ||
+            typeof resposta.revisao !== "number" ||
+            !Number.isInteger(resposta.revisao) ||
+            resposta.revisao < 0
+        ) {
+            throw new Error("O servidor confirmou a operação sem uma revisão válida.");
+        }
+
+        return resposta.revisao;
     }
 }

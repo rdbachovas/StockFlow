@@ -75,6 +75,7 @@ class ConsumoCarrinhoIntegrationTest {
     void registraConsumoValidoRodrigo() throws Exception {
         consumir("RODRIGO", item("MILHO", 10))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").isNumber())
                 .andExpect(jsonPath("$.responsavelId").value("RODRIGO"))
                 .andExpect(jsonPath("$.estoqueOrigemId")
                         .value("ESTOQUE_RODRIGO"));

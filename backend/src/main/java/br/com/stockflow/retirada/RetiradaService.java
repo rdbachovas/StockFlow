@@ -8,6 +8,7 @@ import br.com.stockflow.estoque.Estoque;
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,15 +21,18 @@ public class RetiradaService {
     private final EstoqueRepository estoqueRepository;
     private final EstoqueItemRepository estoqueItemRepository;
     private final RetiradaRepository retiradaRepository;
+    private final RevisaoService revisaoService;
 
     public RetiradaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
-            RetiradaRepository retiradaRepository
+            RetiradaRepository retiradaRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.retiradaRepository = retiradaRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -134,7 +138,7 @@ public class RetiradaService {
         }
 
         Retirada salva = retiradaRepository.save(retirada);
-        return RetiradaResponse.de(salva);
+        return RetiradaResponse.de(salva, revisaoService.avancar());
     }
 
     private Map<String, RetiradaRequest.Item> validarEIndexarItens(

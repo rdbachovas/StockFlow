@@ -11,6 +11,7 @@ import br.com.stockflow.estoque.Estoque;
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,15 +38,18 @@ public class ReservaService {
     private final EstoqueRepository estoqueRepository;
     private final EstoqueItemRepository estoqueItemRepository;
     private final ReservaRepository reservaRepository;
+    private final RevisaoService revisaoService;
 
     public ReservaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
-            ReservaRepository reservaRepository
+            ReservaRepository reservaRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -86,7 +90,10 @@ public class ReservaService {
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
 
-        return ReservaResponse.de(reservaRepository.save(reserva));
+        return ReservaResponse.de(
+                reservaRepository.save(reserva),
+                revisaoService.avancar()
+        );
     }
 
     @Transactional
@@ -109,7 +116,7 @@ public class ReservaService {
         }
 
         reserva.cancelar(OffsetDateTime.now(ZoneOffset.UTC));
-        return ReservaResponse.de(reserva);
+        return ReservaResponse.de(reserva, revisaoService.avancar());
     }
 
     private void validarDestino(

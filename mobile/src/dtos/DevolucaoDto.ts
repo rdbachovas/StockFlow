@@ -17,5 +17,6 @@ export interface RegistrarDevolucaoRequestDto {
 }
 
 export interface RegistrarDevolucaoResponseDto {
+    revisao: number;
     id: string;
 }

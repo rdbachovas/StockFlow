@@ -28,6 +28,7 @@ function reserva(responsavelId: "RODRIGO" | "CESAR" = "RODRIGO"): Reserva {
 
 function snapshot(status = "ATIVA"): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [] },
             { id: "ESTOQUE_RODRIGO", nome: "Rodrigo", responsavelId: "RODRIGO", itens: [{ produtoId: "MIX", nome: "Mix", grupo: "PELUCIA", quantidade: 10 }] },
@@ -55,14 +56,14 @@ describe("reservas remotas", () => {
     });
 
     test("criação válida chama POST", async () => {
-        const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         await ReservaRemotaService.criar(reserva(), "ONLINE");
         expect(post).toHaveBeenCalledWith({ responsavelId: "RODRIGO", destino: "BOULEVARD", produtoId: "MIX", quantidade: 4 });
     });
 
     test("criação atualiza pelo snapshot", async () => {
-        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");
@@ -71,7 +72,7 @@ describe("reservas remotas", () => {
     });
 
     test("criação remota para Cesar envia a intenção correta", async () => {
-        const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         await ReservaRemotaService.criar(reserva("CESAR"), "ONLINE");
         expect(post).toHaveBeenCalledWith({
@@ -83,7 +84,7 @@ describe("reservas remotas", () => {
     });
 
     test("criação persiste cache", async () => {
-        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");
@@ -107,14 +108,14 @@ describe("reservas remotas", () => {
     });
 
     test("cancelamento válido chama endpoint correto", async () => {
-        const post = jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar(snapshot("CANCELADA"));
         await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
         expect(post).toHaveBeenCalledWith("uuid-real", { responsavelId: "RODRIGO" });
     });
 
     test("cancelamento atualiza pelo snapshot", async () => {
-        jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar(snapshot("CANCELADA"));
         const resultado = await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");
@@ -187,7 +188,7 @@ describe("reservas remotas", () => {
     test("toque duplo não gera duplicação", async () => {
         let concluir!: () => void;
         const espera = new Promise<void>((resolve) => { concluir = resolve; });
-        const post = jest.spyOn(ApiService, "criarReserva").mockImplementation(async () => { await espera; return {} as never; });
+        const post = jest.spyOn(ApiService, "criarReserva").mockImplementation(async () => { await espera; return { revisao: 1 } as never; });
         preparar();
         const primeira = ReservaRemotaService.criar(reserva(), "ONLINE");
         await expect(ReservaRemotaService.criar(reserva(), "ONLINE")).rejects.toThrow("Já existe");
@@ -197,7 +198,7 @@ describe("reservas remotas", () => {
     });
 
     test("histórico e datas vêm do snapshot oficial", async () => {
-        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");

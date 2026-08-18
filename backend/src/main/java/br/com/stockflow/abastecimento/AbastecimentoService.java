@@ -14,6 +14,7 @@ import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.reserva.DestinoReserva;
 import br.com.stockflow.reserva.Reserva;
 import br.com.stockflow.reserva.ReservaRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,17 +39,20 @@ public class AbastecimentoService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final ReservaRepository reservaRepository;
     private final AbastecimentoRepository abastecimentoRepository;
+    private final RevisaoService revisaoService;
 
     public AbastecimentoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
-            AbastecimentoRepository abastecimentoRepository
+            AbastecimentoRepository abastecimentoRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.abastecimentoRepository = abastecimentoRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -135,7 +139,8 @@ public class AbastecimentoService {
         }
 
         return AbastecimentoResponse.de(
-                abastecimentoRepository.save(abastecimento)
+                abastecimentoRepository.save(abastecimento),
+                revisaoService.avancar()
         );
     }
 

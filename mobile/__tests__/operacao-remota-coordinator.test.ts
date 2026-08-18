@@ -13,6 +13,7 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [] },
             { id: "ESTOQUE_RODRIGO", nome: "Rodrigo", responsavelId: "RODRIGO", itens: [] },
@@ -46,9 +47,11 @@ describe("OperacaoRemotaCoordinator", () => {
             ordem.push("post A iniciou");
             await esperaA;
             ordem.push("post A terminou");
+            return { revisao: 1 };
         }, "ONLINE");
         const operacaoB = OperacaoRemotaCoordinator.executar(async () => {
             ordem.push("post B iniciou");
+            return { revisao: 1 };
         }, "ONLINE");
 
         await Promise.resolve();
@@ -77,7 +80,7 @@ describe("OperacaoRemotaCoordinator", () => {
         preparar();
         const estados: string[] = [];
         const resultado = await OperacaoRemotaCoordinator.executar(
-            async () => undefined,
+            async () => ({ revisao: 1 }),
             "ONLINE",
             (estado) => estados.push(estado)
         );
@@ -87,7 +90,7 @@ describe("OperacaoRemotaCoordinator", () => {
     });
 
     test("GET falha após POST, fica pendente e nova tentativa repete somente GET", async () => {
-        const post = jest.fn(async () => undefined);
+        const post = jest.fn(async () => ({ revisao: 1 }));
         jest.spyOn(ApiService, "obterSnapshot").mockRejectedValueOnce(new ErroApi("sem rede"));
         const salvar = jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
         const primeiro = await OperacaoRemotaCoordinator.executar(post, "ONLINE");
@@ -103,7 +106,7 @@ describe("OperacaoRemotaCoordinator", () => {
     });
 
     test("falha do SnapshotMapper após POST não repete POST", async () => {
-        const post = jest.fn(async () => undefined);
+        const post = jest.fn(async () => ({ revisao: 1 }));
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(SnapshotMapper, "paraDadosIniciais").mockImplementationOnce(() => {
             throw new Error("snapshot inválido");
@@ -120,7 +123,7 @@ describe("OperacaoRemotaCoordinator", () => {
     test("falha do AsyncStorage mantém confirmação e entrega dados oficiais", async () => {
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockRejectedValue(new Error("cache indisponível"));
-        const resultado = await OperacaoRemotaCoordinator.executar(async () => undefined, "ONLINE");
+        const resultado = await OperacaoRemotaCoordinator.executar(async () => ({ revisao: 1 }), "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");
         if (resultado.tipo !== "CONFIRMADA") return;
         expect(resultado.cacheAtualizado).toBe(false);
@@ -132,6 +135,47 @@ describe("OperacaoRemotaCoordinator", () => {
         const resultado = await OperacaoRemotaCoordinator.executar(post, "OFFLINE");
         expect(resultado.tipo).toBe("REJEITADA");
         expect(post).not.toHaveBeenCalled();
+    });
+
+    test("POST revisão N não confirma com snapshot N-1 e recuperação repete apenas GET", async () => {
+        const post = jest.fn(async () => ({ revisao: 11 }));
+        jest.spyOn(ApiService, "obterSnapshot")
+            .mockResolvedValueOnce({ ...snapshot(), revisao: 10 })
+            .mockResolvedValueOnce({ ...snapshot(), revisao: 11 });
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        const pendente = await OperacaoRemotaCoordinator.executar(post, "ONLINE");
+        expect(pendente.tipo).toBe("CONFIRMADA_PENDENTE_SNAPSHOT");
+        expect(PersistenceService.salvar).not.toHaveBeenCalled();
+
+        const recuperado = await OperacaoRemotaCoordinator.sincronizarPendente();
+        expect(recuperado.tipo).toBe("CONFIRMADA");
+        expect(post).toHaveBeenCalledTimes(1);
+        if (recuperado.tipo === "CONFIRMADA") {
+            expect(recuperado.dados.revisaoServidor).toBe(11);
+        }
+    });
+
+    test("snapshot antigo nunca substitui a revisão mais nova já aplicada", async () => {
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+        jest.spyOn(ApiService, "obterSnapshot")
+            .mockResolvedValueOnce({ ...snapshot(), revisao: 12 })
+            .mockResolvedValueOnce({ ...snapshot(), revisao: 11 })
+            .mockResolvedValueOnce({ ...snapshot(), revisao: 12 });
+
+        const novo = await OperacaoRemotaCoordinator.executar(
+            async () => ({ revisao: 12 }),
+            "ONLINE"
+        );
+        expect(novo.tipo).toBe("CONFIRMADA");
+
+        const antigo = await OperacaoRemotaCoordinator.executar(
+            async () => ({ revisao: 11 }),
+            "ONLINE"
+        );
+        expect(antigo.tipo).toBe("CONFIRMADA_PENDENTE_SNAPSHOT");
+        expect(PersistenceService.salvar).toHaveBeenCalledTimes(1);
+        await OperacaoRemotaCoordinator.sincronizarPendente();
     });
 
     test("falha de rede no POST muda o estado para offline", async () => {

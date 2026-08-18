@@ -49,6 +49,16 @@ export class InicializacaoService {
             };
         }
 
+        if (
+            dadosCache !== undefined &&
+            dados.revisaoServidor < dadosCache.revisaoServidor
+        ) {
+            return {
+                dados: dadosCache,
+                estadoSincronizacao: "DESATUALIZADO"
+            };
+        }
+
         try {
             await PersistenceService.salvar(dados);
         } catch {

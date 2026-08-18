@@ -33,6 +33,7 @@ function devolucao(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             {
                 id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null,
@@ -80,7 +81,7 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(oficial = snapshot()): void {
-    jest.spyOn(ApiService, "registrarDevolucao").mockResolvedValue({ id: "devolucao-oficial" });
+    jest.spyOn(ApiService, "registrarDevolucao").mockResolvedValue({ id: "devolucao-oficial", revisao: 1 });
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
@@ -185,7 +186,7 @@ describe("devolução remota", () => {
         const pendente = new Promise<void>((resolve) => { concluir = resolve; });
         const post = jest.spyOn(ApiService, "registrarDevolucao").mockImplementation(async () => {
             await pendente;
-            return { id: "oficial" };
+            return { id: "oficial", revisao: 1 };
         });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();

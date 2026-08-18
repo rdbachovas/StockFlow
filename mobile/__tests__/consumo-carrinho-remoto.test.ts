@@ -30,6 +30,7 @@ function consumo(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             {
                 id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null,
@@ -58,7 +59,7 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(oficial = snapshot()): void {
-    jest.spyOn(ApiService, "registrarConsumoCarrinho").mockResolvedValue({ id: "consumo-oficial" });
+    jest.spyOn(ApiService, "registrarConsumoCarrinho").mockResolvedValue({ id: "consumo-oficial", revisao: 1 });
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
@@ -169,7 +170,7 @@ describe("consumo remoto do carrinho", () => {
         const pendente = new Promise<void>((resolve) => { concluir = resolve; });
         const post = jest.spyOn(ApiService, "registrarConsumoCarrinho").mockImplementation(async () => {
             await pendente;
-            return { id: "consumo-oficial" };
+            return { id: "consumo-oficial", revisao: 1 };
         });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();

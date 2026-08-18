@@ -10,6 +10,8 @@ import { UsuarioId } from "../models/Usuario";
 
 export interface DadosIniciais {
 
+    revisaoServidor: number;
+
     estoquePrincipal: Estoque;
 
     estoqueRodrigo: Estoque;
@@ -35,6 +37,8 @@ export function criarDadosIniciais():
     DadosIniciais {
 
     return {
+
+        revisaoServidor: 0,
 
         estoquePrincipal: {
 

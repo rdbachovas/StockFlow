@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record ConsumoCarrinhoResponse(
+        long revisao,
         UUID id,
         String responsavelId,
         String estoqueOrigemId,
@@ -13,8 +14,12 @@ public record ConsumoCarrinhoResponse(
         String observacao
 ) {
 
-    public static ConsumoCarrinhoResponse de(ConsumoCarrinho consumo) {
+    public static ConsumoCarrinhoResponse de(
+            ConsumoCarrinho consumo,
+            long revisao
+    ) {
         return new ConsumoCarrinhoResponse(
+                revisao,
                 consumo.getId(),
                 consumo.getResponsavel().getId(),
                 consumo.getEstoqueOrigem().getId(),

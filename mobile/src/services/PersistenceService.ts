@@ -5,7 +5,7 @@ import { DadosIniciais } from "../data/AppData";
 export const CHAVE_ESTADO_APP =
     "@stockflow/estado";
 
-export const VERSAO_ESTADO_APP = 1;
+export const VERSAO_ESTADO_APP = 2;
 
 interface EnvelopePersistencia {
     versao: number;
@@ -296,7 +296,7 @@ function reservaValida(
 function dadosValidos(
     valor: unknown
 ): valor is DadosIniciais {
-    if (!objeto(valor)) {
+    if (!objeto(valor) || !numeroNaoNegativo(valor.revisaoServidor)) {
         return false;
     }
 
@@ -452,11 +452,7 @@ export class PersistenceService {
             };
         }
 
-        if (
-            !objeto(envelope) ||
-            envelope.versao !==
-                VERSAO_ESTADO_APP
-        ) {
+        if (!objeto(envelope) || ![1, VERSAO_ESTADO_APP].includes(envelope.versao as number)) {
             return {
                 tipo: "INVALIDO",
                 motivo:
@@ -464,7 +460,11 @@ export class PersistenceService {
             };
         }
 
-        if (!dadosValidos(envelope.dados)) {
+        const dadosCompatíveis = envelope.versao === 1 && objeto(envelope.dados)
+            ? { ...envelope.dados, revisaoServidor: 0 }
+            : envelope.dados;
+
+        if (!dadosValidos(dadosCompatíveis)) {
             return {
                 tipo: "INVALIDO",
                 motivo:
@@ -476,7 +476,7 @@ export class PersistenceService {
             tipo: "VALIDO",
             dados:
                 restaurarDatas(
-                    envelope.dados
+                    dadosCompatíveis
                 )
         };
     }

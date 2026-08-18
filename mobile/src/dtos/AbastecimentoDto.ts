@@ -11,6 +11,7 @@ export interface RegistrarAbastecimentoRequestDto {
 }
 
 export interface RegistrarAbastecimentoResponseDto {
+    revisao: number;
     id: string;
     responsavelId: string;
     estoqueOrigemId: string;

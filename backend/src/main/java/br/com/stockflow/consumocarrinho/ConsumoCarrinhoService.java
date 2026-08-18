@@ -9,6 +9,7 @@ import br.com.stockflow.estoque.Estoque;
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +27,18 @@ public class ConsumoCarrinhoService {
     private final EstoqueRepository estoqueRepository;
     private final EstoqueItemRepository estoqueItemRepository;
     private final ConsumoCarrinhoRepository consumoRepository;
+    private final RevisaoService revisaoService;
 
     public ConsumoCarrinhoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
-            ConsumoCarrinhoRepository consumoRepository
+            ConsumoCarrinhoRepository consumoRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.consumoRepository = consumoRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -73,7 +77,10 @@ public class ConsumoCarrinhoService {
             ));
         }
 
-        return ConsumoCarrinhoResponse.de(consumoRepository.save(consumo));
+        return ConsumoCarrinhoResponse.de(
+                consumoRepository.save(consumo),
+                revisaoService.avancar()
+        );
     }
 
     private Map<String, ConsumoCarrinhoRequest.Item> validarEIndexar(

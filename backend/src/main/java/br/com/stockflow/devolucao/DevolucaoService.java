@@ -13,6 +13,7 @@ import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.reserva.DestinoReserva;
 import br.com.stockflow.reserva.Reserva;
 import br.com.stockflow.reserva.ReservaRepository;
+import br.com.stockflow.revisao.RevisaoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +26,20 @@ public class DevolucaoService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final ReservaRepository reservaRepository;
     private final DevolucaoRepository devolucaoRepository;
+    private final RevisaoService revisaoService;
 
     public DevolucaoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
-            DevolucaoRepository devolucaoRepository
+            DevolucaoRepository devolucaoRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.devolucaoRepository = devolucaoRepository;
+        this.revisaoService = revisaoService;
     }
 
     @Transactional
@@ -126,7 +130,10 @@ public class DevolucaoService {
             devolucao.adicionarItem(itemDevolucao);
         }
 
-        return DevolucaoResponse.de(devolucaoRepository.save(devolucao));
+        return DevolucaoResponse.de(
+                devolucaoRepository.save(devolucao),
+                revisaoService.avancar()
+        );
     }
 
     private Map<String, ItemSolicitado> validarEIndexar(

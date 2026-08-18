@@ -151,6 +151,9 @@ export function AppProvider({
                     return;
                 }
 
+                OperacaoRemotaCoordinator.registrarRevisaoAplicada(
+                    resultado.dados.revisaoServidor
+                );
                 setDados(resultado.dados);
                 setEstadoSincronizacao(
                     resultado.estadoSincronizacao
@@ -179,7 +182,15 @@ export function AppProvider({
             return;
         }
 
-        setDados(resultado.dados);
+        OperacaoRemotaCoordinator.registrarRevisaoAplicada(
+            resultado.dados.revisaoServidor
+        );
+        setDados((dadosAtuais) =>
+            dadosAtuais === null ||
+            resultado.dados.revisaoServidor >= dadosAtuais.revisaoServidor
+                ? resultado.dados
+                : dadosAtuais
+        );
         setEstadoSincronizacao("ONLINE");
 
         if (!resultado.cacheAtualizado) {

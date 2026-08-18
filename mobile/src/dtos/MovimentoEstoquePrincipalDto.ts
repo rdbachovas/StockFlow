@@ -11,5 +11,6 @@ export interface RegistrarMovimentoEstoquePrincipalRequestDto {
 }
 
 export interface RegistrarMovimentoEstoquePrincipalResponseDto {
+    revisao: number;
     id: string;
 }

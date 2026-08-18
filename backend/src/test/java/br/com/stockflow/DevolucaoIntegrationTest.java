@@ -86,7 +86,8 @@ class DevolucaoIntegrationTest {
     @Test
     void devolveSomenteLivre() throws Exception {
         devolver("RODRIGO", item("MIX", 20, "[]"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").isNumber());
         assertThat(saldo("ESTOQUE_RODRIGO", "MIX")).isEqualTo(80);
     }
 

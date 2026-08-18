@@ -263,6 +263,31 @@ describe(
             }
         );
 
+        test("persiste a revisão e migra cache antigo sem revisão para zero", async () => {
+            const dados = criarDadosComHistorico();
+            dados.revisaoServidor = 15;
+            armazenamento.setItem.mockResolvedValue();
+
+            await PersistenceService.salvar(dados);
+            const salvo = JSON.parse(
+                armazenamento.setItem.mock.calls[0][1]
+            );
+            expect(salvo.dados.revisaoServidor).toBe(15);
+
+            const dadosAntigos = { ...criarDadosComHistorico() } as Record<string, unknown>;
+            delete dadosAntigos.revisaoServidor;
+            armazenamento.getItem.mockResolvedValue(JSON.stringify({
+                versao: 1,
+                dados: dadosAntigos
+            }));
+
+            const carregado = await PersistenceService.carregar();
+            expect(carregado.tipo).toBe("VALIDO");
+            if (carregado.tipo === "VALIDO") {
+                expect(carregado.dados.revisaoServidor).toBe(0);
+            }
+        });
+
         test.each([
             [
                 "JSON corrompido",

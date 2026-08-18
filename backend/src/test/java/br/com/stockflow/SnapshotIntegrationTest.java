@@ -90,6 +90,7 @@ class SnapshotIntegrationTest {
     void retornaOsTresEstoques() throws Exception {
         mockMvc.perform(get("/api/v1/snapshot"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.revisao").isNumber())
                 .andExpect(jsonPath("$.estoques.length()").value(3))
                 .andExpect(jsonPath("$.estoques[0].id")
                         .value("ESTOQUE_CESAR"))

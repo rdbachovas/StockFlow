@@ -10,6 +10,7 @@ export interface CancelarReservaRequestDto {
 }
 
 export interface ReservaResponseDto {
+    revisao: number;
     id: string;
     responsavelId: string;
     destino: string;

@@ -26,6 +26,7 @@ import br.com.stockflow.retirada.Retirada;
 import br.com.stockflow.retirada.RetiradaItem;
 
 public record SnapshotResponse(
+        long revisao,
         List<EstoqueDto> estoques,
         List<ReservaDto> reservas,
         List<RetiradaDto> retiradas,
