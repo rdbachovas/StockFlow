@@ -6,7 +6,13 @@ import {
 import { PersistenceService } from "./PersistenceService";
 import { SnapshotMapper } from "./SnapshotMapper";
 
-export type EstadoSincronizacao = "CARREGANDO" | "ONLINE" | "OFFLINE" | "ERRO";
+export type EstadoSincronizacao =
+    | "CARREGANDO"
+    | "ONLINE"
+    | "SINCRONIZANDO"
+    | "DESATUALIZADO"
+    | "OFFLINE"
+    | "ERRO";
 
 export interface ResultadoInicializacao {
     dados: DadosIniciais;

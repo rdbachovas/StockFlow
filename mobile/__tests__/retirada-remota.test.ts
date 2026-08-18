@@ -104,7 +104,10 @@ describe("retirada remota", () => {
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(8);
         expect(dados.retiradas[0].id).toBe("backend-id");
@@ -115,7 +118,10 @@ describe("retirada remota", () => {
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         const salvar = jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(salvar).toHaveBeenCalledWith(dados);
     });
@@ -189,9 +195,11 @@ describe("retirada remota", () => {
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
 
-        expect(dados.retiradas[0].data).toBeInstanceOf(Date);
+        expect(resultado.dados.retiradas[0].data).toBeInstanceOf(Date);
     });
 
     test("offline não registra localmente nem chama o backend", async () => {

@@ -134,7 +134,10 @@ describe("devolução remota", () => {
 
     test("substitui saldos, reservas e histórico pelo snapshot oficial e atualiza cache", async () => {
         preparar();
-        const dados = await DevolucaoRemotaService.registrar(devolucao(), "ONLINE");
+        const resultado = await DevolucaoRemotaService.registrar(devolucao(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(ApiService.obterSnapshot).toHaveBeenCalledTimes(1);
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(335);
         expect(dados.estoqueRodrigo.itens[0].quantidade).toBe(65);

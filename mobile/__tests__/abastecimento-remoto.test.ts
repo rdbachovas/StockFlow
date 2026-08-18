@@ -139,7 +139,10 @@ describe("abastecimento remoto", () => {
                 quantidade: 4
             }]
         );
-        const dados = await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
+        const resultado = await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith(
             expect.objectContaining({ local: "SUPERMERCADO_FANTE" })
@@ -166,7 +169,10 @@ describe("abastecimento remoto", () => {
 
     test("aplica snapshot oficial, reserva consumida, estoque e cache", async () => {
         preparar();
-        const dados = await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
+        const resultado = await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(dados.abastecimentos[0].id).toBe("abastecimento-oficial");
         expect(dados.reservas[0].quantidadeUtilizada).toBe(4);
         expect(dados.reservas[0].historico?.[0].id).toBe("uso-oficial");

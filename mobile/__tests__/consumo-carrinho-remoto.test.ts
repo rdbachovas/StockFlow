@@ -101,7 +101,10 @@ describe("consumo remoto do carrinho", () => {
 
     test("aplica estoque, histórico e saldos oficiais e atualiza cache", async () => {
         preparar();
-        const dados = await ConsumoCarrinhoRemotoService.registrar(consumo(), "ONLINE");
+        const resultado = await ConsumoCarrinhoRemotoService.registrar(consumo(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(ApiService.obterSnapshot).toHaveBeenCalledTimes(1);
         expect(dados.estoqueRodrigo.itens[0].quantidade).toBe(43);
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(100);

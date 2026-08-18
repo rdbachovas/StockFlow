@@ -105,7 +105,10 @@ describe("movimento remoto do Estoque Principal", () => {
 
     test("aplica saldo e histórico oficiais do snapshot e atualiza o cache", async () => {
         preparar();
-        const dados = await MovimentoEstoquePrincipalRemotoService.registrar(movimento(), "ONLINE");
+        const resultado = await MovimentoEstoquePrincipalRemotoService.registrar(movimento(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(ApiService.obterSnapshot).toHaveBeenCalledTimes(1);
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(320);
         expect(dados.movimentosEstoquePrincipal[0]).toEqual(expect.objectContaining({

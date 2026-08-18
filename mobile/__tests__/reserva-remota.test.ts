@@ -64,7 +64,10 @@ describe("reservas remotas", () => {
     test("criação atualiza pelo snapshot", async () => {
         jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
         preparar();
-        expect((await ReservaRemotaService.criar(reserva(), "ONLINE")).reservas[0].id).toBe("backend-id");
+        const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        expect(resultado.dados.reservas[0].id).toBe("backend-id");
     });
 
     test("criação remota para Cesar envia a intenção correta", async () => {
@@ -82,8 +85,10 @@ describe("reservas remotas", () => {
     test("criação persiste cache", async () => {
         jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
         preparar();
-        const dados = await ReservaRemotaService.criar(reserva(), "ONLINE");
-        expect(PersistenceService.salvar).toHaveBeenCalledWith(dados);
+        const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        expect(PersistenceService.salvar).toHaveBeenCalledWith(resultado.dados);
     });
 
     test("erro na criação preserva estado e não executa regra local", async () => {
@@ -111,7 +116,10 @@ describe("reservas remotas", () => {
     test("cancelamento atualiza pelo snapshot", async () => {
         jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({} as never);
         preparar(snapshot("CANCELADA"));
-        const dados = await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
+        const resultado = await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(dados.reservas[0].status).toBe(StatusReserva.CANCELADA);
         expect(PersistenceService.salvar).toHaveBeenCalledWith(dados);
     });
@@ -191,7 +199,10 @@ describe("reservas remotas", () => {
     test("histórico e datas vêm do snapshot oficial", async () => {
         jest.spyOn(ApiService, "criarReserva").mockResolvedValue({} as never);
         preparar();
-        const dados = await ReservaRemotaService.criar(reserva(), "ONLINE");
+        const resultado = await ReservaRemotaService.criar(reserva(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(dados.reservas[0].historico?.[0].id).toBe("evento-backend");
         expect(dados.reservas[0].dataCriacao).toBeInstanceOf(Date);
         expect(dados.reservas[0].historico?.[0].data).toBeInstanceOf(Date);

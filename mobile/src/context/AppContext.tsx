@@ -32,13 +32,16 @@ import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoServi
 import { ConsumoCarrinhoRemotoService } from "../services/ConsumoCarrinhoRemotoService";
 import { DevolucaoRemotaService } from "../services/DevolucaoRemotaService";
 import { MovimentoEstoquePrincipalRemotoService } from "../services/MovimentoEstoquePrincipalRemotoService";
-import { PersistenceService } from "../services/PersistenceService";
 import {
     EstadoSincronizacao,
     InicializacaoService
 } from "../services/InicializacaoService";
 import { ReservaRemotaService } from "../services/ReservaRemotaService";
 import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
+import {
+    OperacaoRemotaCoordinator,
+    ResultadoOperacao
+} from "../services/OperacaoRemotaCoordinator";
 
 interface AppContextValue {
 
@@ -101,6 +104,8 @@ interface AppContextValue {
             solicitacao:
                 SolicitacaoConsumoCarrinho
         ) => Promise<void>;
+
+    sincronizarSnapshotPendente: () => Promise<void>;
 }
 
 const AppContext =
@@ -162,31 +167,28 @@ export function AppProvider({
         []
     );
 
-    useEffect(
-        () => {
-            if (
-                !hidratado ||
-                !dados
-            ) {
-                return;
-            }
+    const aplicarResultado = (
+        resultado: ResultadoOperacao
+    ): void => {
+        if (resultado.tipo === "REJEITADA") {
+            throw resultado.erro;
+        }
 
-            void PersistenceService
-                .salvar(dados)
-                .catch(
-                    (erro: unknown) => {
-                        console.error(
-                            "Não foi possível salvar o estado.",
-                            erro
-                        );
-                    }
-                );
-        },
-        [
-            dados,
-            hidratado
-        ]
-    );
+        if (resultado.tipo === "CONFIRMADA_PENDENTE_SNAPSHOT") {
+            setEstadoSincronizacao("DESATUALIZADO");
+            return;
+        }
+
+        setDados(resultado.dados);
+        setEstadoSincronizacao("ONLINE");
+
+        if (!resultado.cacheAtualizado) {
+            console.error(
+                "Snapshot aplicado, mas não foi possível atualizar o cache.",
+                resultado.erroCache
+            );
+        }
+    };
 
     const registrarRetirada = (
         retirada: RetiradaEstoque
@@ -194,34 +196,26 @@ export function AppProvider({
         return RetiradaRemotaService
             .registrar(
                 retirada,
-                estadoSincronizacao
+                estadoSincronizacao,
+                setEstadoSincronizacao
             )
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .then(aplicarResultado);
     };
 
     const registrarAbastecimento = (
         abastecimento: Abastecimento
     ): Promise<void> => {
         return AbastecimentoRemotoService
-            .registrar(abastecimento, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .registrar(abastecimento, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const criarReserva = (
         reserva: Reserva
     ): Promise<void> => {
         return ReservaRemotaService
-            .criar(reserva, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .criar(reserva, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const cancelarReserva = (
@@ -232,23 +226,18 @@ export function AppProvider({
             .cancelar(
                 reservaId,
                 responsavelId,
-                estadoSincronizacao
+                estadoSincronizacao,
+                setEstadoSincronizacao
             )
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .then(aplicarResultado);
     };
 
     const registrarDevolucao = (
         devolucao: DevolucaoEstoque
     ): Promise<void> => {
         return DevolucaoRemotaService
-            .registrar(devolucao, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .registrar(devolucao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const registrarMovimentoEstoquePrincipal = (
@@ -256,11 +245,8 @@ export function AppProvider({
             SolicitacaoMovimentoEstoquePrincipal
     ): Promise<void> => {
         return MovimentoEstoquePrincipalRemotoService
-            .registrar(solicitacao, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .registrar(solicitacao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const registrarConsumoCarrinho = (
@@ -268,11 +254,14 @@ export function AppProvider({
             SolicitacaoConsumoCarrinho
     ): Promise<void> => {
         return ConsumoCarrinhoRemotoService
-            .registrar(solicitacao, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .registrar(solicitacao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
+    };
+
+    const sincronizarSnapshotPendente = (): Promise<void> => {
+        return OperacaoRemotaCoordinator
+            .sincronizarPendente(setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     if (
@@ -327,7 +316,9 @@ export function AppProvider({
 
                 registrarMovimentoEstoquePrincipal,
 
-                registrarConsumoCarrinho
+                registrarConsumoCarrinho,
+
+                sincronizarSnapshotPendente
             }}
         >
             {children}
