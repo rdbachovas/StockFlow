@@ -32,7 +32,7 @@ import { UsuarioId } from "../models/Usuario";
 import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoService";
 import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
 import { DevolucaoRemotaService } from "../services/DevolucaoRemotaService";
-import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
+import { MovimentoEstoquePrincipalRemotoService } from "../services/MovimentoEstoquePrincipalRemotoService";
 import { PersistenceService } from "../services/PersistenceService";
 import {
     EstadoSincronizacao,
@@ -95,7 +95,7 @@ interface AppContextValue {
         (
             solicitacao:
                 SolicitacaoMovimentoEstoquePrincipal
-        ) => void;
+        ) => Promise<void>;
 
     registrarConsumoCarrinho:
         (
@@ -310,35 +310,13 @@ export function AppProvider({
     const registrarMovimentoEstoquePrincipal = (
         solicitacao:
             SolicitacaoMovimentoEstoquePrincipal
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const principal =
-            clonarEstoque(
-                dadosAtuais.estoquePrincipal
-            );
-
-        const movimentos = [
-            ...dadosAtuais.movimentosEstoquePrincipal
-        ];
-
-        MovimentoEstoquePrincipalService.registrar(
-            principal,
-            movimentos,
-            solicitacao
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoquePrincipal:
-                principal,
-
-            movimentosEstoquePrincipal:
-                movimentos
-        };
-        });
+    ): Promise<void> => {
+        return MovimentoEstoquePrincipalRemotoService
+            .registrar(solicitacao, estadoSincronizacao)
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const registrarConsumoCarrinho = (

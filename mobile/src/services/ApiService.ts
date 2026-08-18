@@ -16,6 +16,10 @@ import {
     RegistrarDevolucaoRequestDto,
     RegistrarDevolucaoResponseDto
 } from "../dtos/DevolucaoDto";
+import {
+    RegistrarMovimentoEstoquePrincipalRequestDto,
+    RegistrarMovimentoEstoquePrincipalResponseDto
+} from "../dtos/MovimentoEstoquePrincipalDto";
 
 export class ErroApi extends Error {
     constructor(
@@ -138,6 +142,15 @@ export class ApiService {
         return await this.post<RegistrarDevolucaoResponseDto>(
             "/api/v1/devolucoes",
             devolucao
+        );
+    }
+
+    static async registrarMovimentoEstoquePrincipal(
+        movimento: RegistrarMovimentoEstoquePrincipalRequestDto
+    ): Promise<RegistrarMovimentoEstoquePrincipalResponseDto> {
+        return await this.post<RegistrarMovimentoEstoquePrincipalResponseDto>(
+            "/api/v1/movimentos-estoque-principal",
+            movimento
         );
     }
 
