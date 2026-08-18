@@ -20,6 +20,10 @@ import {
     RegistrarMovimentoEstoquePrincipalRequestDto,
     RegistrarMovimentoEstoquePrincipalResponseDto
 } from "../dtos/MovimentoEstoquePrincipalDto";
+import {
+    RegistrarConsumoCarrinhoRequestDto,
+    RegistrarConsumoCarrinhoResponseDto
+} from "../dtos/ConsumoCarrinhoDto";
 
 export class ErroApi extends Error {
     constructor(
@@ -151,6 +155,15 @@ export class ApiService {
         return await this.post<RegistrarMovimentoEstoquePrincipalResponseDto>(
             "/api/v1/movimentos-estoque-principal",
             movimento
+        );
+    }
+
+    static async registrarConsumoCarrinho(
+        consumo: RegistrarConsumoCarrinhoRequestDto
+    ): Promise<RegistrarConsumoCarrinhoResponseDto> {
+        return await this.post<RegistrarConsumoCarrinhoResponseDto>(
+            "/api/v1/consumos-carrinho",
+            consumo
         );
     }
 

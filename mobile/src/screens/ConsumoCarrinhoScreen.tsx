@@ -36,7 +36,7 @@ import {
 interface Props {
     estoqueRodrigo: Estoque;
     estoqueCesar: Estoque;
-    registrarConsumo: (solicitacao: SolicitacaoConsumoCarrinho) => void;
+    registrarConsumo: (solicitacao: SolicitacaoConsumoCarrinho) => Promise<void>;
 }
 
 export function ConsumoCarrinhoScreen({
@@ -49,6 +49,7 @@ export function ConsumoCarrinhoScreen({
     const [observacao, setObservacao] = useState("");
     const [erro, setErro] = useState<string | null>(null);
     const [sucesso, setSucesso] = useState<string | null>(null);
+    const [enviando, setEnviando] = useState(false);
     const estoque = responsavel === UsuarioId.RODRIGO ? estoqueRodrigo : estoqueCesar;
 
     const saldo = (produtoId: ProdutoId) =>
@@ -69,7 +70,11 @@ export function ConsumoCarrinhoScreen({
         setSucesso(null);
     };
 
-    const confirmar = () => {
+    const confirmar = async () => {
+        if (enviando) {
+            return;
+        }
+
         setErro(null);
         setSucesso(null);
         if (itens.length === 0) {
@@ -85,13 +90,16 @@ export function ConsumoCarrinhoScreen({
             observacao: observacao.trim() || undefined
         };
 
+        setEnviando(true);
         try {
-            registrarConsumo(solicitacao);
+            await registrarConsumo(solicitacao);
             setQuantidades({});
             setObservacao("");
             setSucesso(`${total} itens baixados do estoque pessoal.`);
         } catch (caughtError) {
             setErro(caughtError instanceof Error ? caughtError.message : "Erro ao registrar consumo.");
+        } finally {
+            setEnviando(false);
         }
     };
 
@@ -149,7 +157,8 @@ export function ConsumoCarrinhoScreen({
                 summaryLabel="Total"
                 summaryValue={`${total} itens`}
                 actionLabel="Confirmar consumo"
-                onPress={confirmar}
+                onPress={() => { void confirmar(); }}
+                loading={enviando}
             />
         </View>
     );

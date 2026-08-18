@@ -27,10 +27,9 @@ import {
 
 import { Reserva } from "../models/Reserva";
 import { RetiradaEstoque } from "../models/RetiradaEstoque";
-import { UsuarioId } from "../models/Usuario";
 
 import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoService";
-import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
+import { ConsumoCarrinhoRemotoService } from "../services/ConsumoCarrinhoRemotoService";
 import { DevolucaoRemotaService } from "../services/DevolucaoRemotaService";
 import { MovimentoEstoquePrincipalRemotoService } from "../services/MovimentoEstoquePrincipalRemotoService";
 import { PersistenceService } from "../services/PersistenceService";
@@ -101,7 +100,7 @@ interface AppContextValue {
         (
             solicitacao:
                 SolicitacaoConsumoCarrinho
-        ) => void;
+        ) => Promise<void>;
 }
 
 const AppContext =
@@ -111,40 +110,6 @@ const AppContext =
 
 interface Props {
     children: ReactNode;
-}
-
-function clonarEstoque(
-    estoque: Estoque
-): Estoque {
-
-    return {
-        ...estoque,
-
-        itens:
-            estoque.itens.map(
-                (item) => ({
-                    ...item
-                })
-            )
-    };
-}
-
-function clonarReservas(
-    reservas: Reserva[]
-): Reserva[] {
-
-    return reservas.map(
-        (reserva) => ({
-            ...reserva,
-
-            historico:
-                reserva.historico?.map(
-                    (evento) => ({
-                        ...evento
-                    })
-                )
-        })
-    );
 }
 
 export function AppProvider({
@@ -222,27 +187,6 @@ export function AppProvider({
             hidratado
         ]
     );
-
-    const atualizarDados = (
-        atualizador:
-            (
-                dadosAtuais: DadosIniciais
-            ) => DadosIniciais
-    ): void => {
-        setDados(
-            (dadosAtuais) => {
-                if (!dadosAtuais) {
-                    throw new Error(
-                        "O estado ainda não foi carregado."
-                    );
-                }
-
-                return atualizador(
-                    dadosAtuais
-                );
-            }
-        );
-    };
 
     const registrarRetirada = (
         retirada: RetiradaEstoque
@@ -322,59 +266,13 @@ export function AppProvider({
     const registrarConsumoCarrinho = (
         solicitacao:
             SolicitacaoConsumoCarrinho
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const rodrigo =
-            clonarEstoque(
-                dadosAtuais.estoqueRodrigo
-            );
-
-        const cesar =
-            clonarEstoque(
-                dadosAtuais.estoqueCesar
-            );
-
-        const consumos = [
-            ...dadosAtuais.consumosCarrinho
-        ];
-
-        const estoque =
-            solicitacao.responsavelId ===
-                UsuarioId.RODRIGO
-                ? rodrigo
-                : solicitacao.responsavelId ===
-                    UsuarioId.CESAR
-                    ? cesar
-                    : undefined;
-
-        if (!estoque) {
-
-            throw new Error(
-                "Responsável inválido."
-            );
-        }
-
-        ConsumoCarrinhoService.registrar(
-            estoque,
-            consumos,
-            solicitacao
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoqueRodrigo:
-                rodrigo,
-
-            estoqueCesar:
-                cesar,
-
-            consumosCarrinho:
-                consumos
-        };
-        });
+    ): Promise<void> => {
+        return ConsumoCarrinhoRemotoService
+            .registrar(solicitacao, estadoSincronizacao)
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     if (
