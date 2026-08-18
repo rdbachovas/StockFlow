@@ -47,7 +47,7 @@ interface Props {
     estoqueCesar: Estoque;
     estoquePrincipal: Estoque;
     reservas: Reserva[];
-    registrarDevolucao: (devolucao: DevolucaoEstoque) => void;
+    registrarDevolucao: (devolucao: DevolucaoEstoque) => Promise<void>;
 }
 
 function nomeDestino(destinoId: DestinoReservaId): string {
@@ -74,6 +74,7 @@ export function DevolucaoEstoqueScreen({
     const [quantidadesReservas, setQuantidadesReservas] = useState<Record<string, string>>({});
     const [mensagem, setMensagem] = useState<string | null>(null);
     const [erro, setErro] = useState<string | null>(null);
+    const [enviando, setEnviando] = useState(false);
     const estoquePessoal = responsavel === UsuarioId.RODRIGO ? estoqueRodrigo : estoqueCesar;
     const produtos = TODOS_PRODUTOS.filter((produtoId) =>
         (estoquePessoal.itens.find((item) => item.produtoId === produtoId)?.quantidade ?? 0) > 0
@@ -115,7 +116,11 @@ export function DevolucaoEstoqueScreen({
         setMensagem(null);
     };
 
-    const confirmar = () => {
+    const confirmar = async () => {
+        if (enviando) {
+            return;
+        }
+
         setErro(null);
         setMensagem(null);
         if (!produtoSelecionado || total <= 0) {
@@ -137,12 +142,15 @@ export function DevolucaoEstoqueScreen({
             }],
             data: new Date()
         };
+        setEnviando(true);
         try {
-            registrarDevolucao(devolucao);
+            await registrarDevolucao(devolucao);
             limparSelecao();
             setMensagem(`${total} ${nomeProduto(produtoSelecionado)} devolvidos ao Estoque Principal.`);
         } catch (caughtError) {
             setErro(caughtError instanceof Error ? caughtError.message : "Erro ao registrar devolução.");
+        } finally {
+            setEnviando(false);
         }
     };
 
@@ -209,7 +217,7 @@ export function DevolucaoEstoqueScreen({
                 {erro ? <FeedbackBanner title="Não foi possível devolver" message={erro} variant="danger" /> : null}
                 {mensagem ? <FeedbackBanner title="Devolução registrada" message={mensagem} /> : null}
             </Screen>
-            <BottomActionBar summaryLabel="Devolução" summaryValue={`${total} itens`} actionLabel="Confirmar devolução" onPress={confirmar} />
+            <BottomActionBar summaryLabel="Devolução" summaryValue={`${total} itens`} actionLabel="Confirmar devolução" onPress={() => { void confirmar(); }} loading={enviando} />
         </View>
     );
 }

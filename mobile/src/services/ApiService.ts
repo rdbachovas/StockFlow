@@ -12,6 +12,10 @@ import {
     CriarReservaRequestDto,
     ReservaResponseDto
 } from "../dtos/ReservaDto";
+import {
+    RegistrarDevolucaoRequestDto,
+    RegistrarDevolucaoResponseDto
+} from "../dtos/DevolucaoDto";
 
 export class ErroApi extends Error {
     constructor(
@@ -125,6 +129,15 @@ export class ApiService {
         return await this.post<RegistrarAbastecimentoResponseDto>(
             "/api/v1/abastecimentos",
             abastecimento
+        );
+    }
+
+    static async registrarDevolucao(
+        devolucao: RegistrarDevolucaoRequestDto
+    ): Promise<RegistrarDevolucaoResponseDto> {
+        return await this.post<RegistrarDevolucaoResponseDto>(
+            "/api/v1/devolucoes",
+            devolucao
         );
     }
 

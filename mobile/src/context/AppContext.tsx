@@ -31,7 +31,7 @@ import { UsuarioId } from "../models/Usuario";
 
 import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoService";
 import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
-import { DevolucaoEstoqueService } from "../services/DevolucaoEstoqueService";
+import { DevolucaoRemotaService } from "../services/DevolucaoRemotaService";
 import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
 import { PersistenceService } from "../services/PersistenceService";
 import {
@@ -89,7 +89,7 @@ interface AppContextValue {
     registrarDevolucao:
         (
             devolucao: DevolucaoEstoque
-        ) => void;
+        ) => Promise<void>;
 
     registrarMovimentoEstoquePrincipal:
         (
@@ -298,74 +298,13 @@ export function AppProvider({
 
     const registrarDevolucao = (
         devolucao: DevolucaoEstoque
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const principal =
-            clonarEstoque(
-                dadosAtuais.estoquePrincipal
-            );
-
-        const rodrigo =
-            clonarEstoque(
-                dadosAtuais.estoqueRodrigo
-            );
-
-        const cesar =
-            clonarEstoque(
-                dadosAtuais.estoqueCesar
-            );
-
-        const reservas =
-            clonarReservas(
-                dadosAtuais.reservas
-            );
-
-        const devolucoes = [
-            ...dadosAtuais.devolucoes
-        ];
-
-        const estoquePessoal =
-            devolucao.responsavelId ===
-                UsuarioId.RODRIGO
-                ? rodrigo
-                : devolucao.responsavelId ===
-                    UsuarioId.CESAR
-                    ? cesar
-                    : undefined;
-
-        if (!estoquePessoal) {
-            throw new Error(
-                "Responsável inválido."
-            );
-        }
-
-        DevolucaoEstoqueService.registrar(
-            estoquePessoal,
-            principal,
-            reservas,
-            devolucoes,
-            devolucao
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoquePrincipal:
-                principal,
-
-            estoqueRodrigo:
-                rodrigo,
-
-            estoqueCesar:
-                cesar,
-
-            reservas,
-
-            devolucoes
-        };
-        });
+    ): Promise<void> => {
+        return DevolucaoRemotaService
+            .registrar(devolucao, estadoSincronizacao)
+            .then((dadosOficiais) => {
+                setDados(dadosOficiais);
+                setEstadoSincronizacao("ONLINE");
+            });
     };
 
     const registrarMovimentoEstoquePrincipal = (
