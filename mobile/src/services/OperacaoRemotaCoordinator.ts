@@ -1,6 +1,6 @@
 import { DadosIniciais } from "../data/AppData";
 import { ApiService, ErroApi } from "./ApiService";
-import { EstadoSincronizacao } from "./InicializacaoService";
+import type { EstadoSincronizacao } from "./InicializacaoService";
 import { PersistenceService } from "./PersistenceService";
 import { SnapshotMapper } from "./SnapshotMapper";
 import { gerarCommandId } from "../utils/CommandId";

@@ -5,6 +5,7 @@ import {
 } from "./ApiService";
 import { PersistenceService } from "./PersistenceService";
 import { SnapshotMapper } from "./SnapshotMapper";
+import { FilaComandosService } from "./FilaComandosService";
 
 export type EstadoSincronizacao =
     | "CARREGANDO"
@@ -23,6 +24,7 @@ export class InicializacaoService {
     static async carregar(): Promise<ResultadoInicializacao> {
         const cache = await PersistenceService.carregar();
         const dadosCache = cache.tipo === "VALIDO" ? cache.dados : undefined;
+        await FilaComandosService.carregar();
         let resposta: unknown;
 
         try {
