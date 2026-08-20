@@ -11,7 +11,8 @@ export class RetiradaRemotaService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "retirada",
-            () => ApiService.registrarRetirada({
+            (commandId) => ApiService.registrarRetirada({
+                commandId,
                 responsavelId: retirada.responsavelId,
                 itens: retirada.itens.map((item) => ({
                     produtoId: item.produtoId,

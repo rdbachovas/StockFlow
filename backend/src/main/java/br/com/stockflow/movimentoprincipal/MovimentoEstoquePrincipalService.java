@@ -7,6 +7,7 @@ import java.util.Map;
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,19 +19,33 @@ public class MovimentoEstoquePrincipalService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final MovimentoEstoquePrincipalRepository movimentoRepository;
     private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public MovimentoEstoquePrincipalService(
             EstoqueItemRepository estoqueItemRepository,
             MovimentoEstoquePrincipalRepository movimentoRepository,
-            RevisaoService revisaoService
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueItemRepository = estoqueItemRepository;
         this.movimentoRepository = movimentoRepository;
         this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public MovimentoEstoquePrincipalResponse registrar(
+            MovimentoEstoquePrincipalRequest request
+    ) {
+        return idempotenciaService.executar(
+                request.commandId(), "MOVIMENTO_ESTOQUE_PRINCIPAL",
+                MovimentoEstoquePrincipalResponse.class,
+                () -> registrarNovo(request),
+                MovimentoEstoquePrincipalResponse::revisao
+        );
+    }
+
+    private MovimentoEstoquePrincipalResponse registrarNovo(
             MovimentoEstoquePrincipalRequest request
     ) {
         Map<String, MovimentoEstoquePrincipalRequest.Item> solicitados =

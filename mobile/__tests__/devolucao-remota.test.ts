@@ -7,6 +7,7 @@ import { ProdutoId } from "../src/models/Produto";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { DevolucaoEstoqueService } from "../src/services/DevolucaoEstoqueService";
 import { DevolucaoRemotaService } from "../src/services/DevolucaoRemotaService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { PersistenceService } from "../src/services/PersistenceService";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -88,6 +89,7 @@ function preparar(oficial = snapshot()): void {
 
 describe("devolução remota", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("devolução");
         jest.restoreAllMocks();
     });
 
@@ -102,6 +104,7 @@ describe("devolução remota", () => {
         preparar();
         await DevolucaoRemotaService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarDevolucao).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: entrada.responsavelId,
             itens: entrada.itens.map((item) => ({
                 produtoId: item.produtoId,

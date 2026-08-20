@@ -10,6 +10,7 @@ import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,21 +29,32 @@ public class ConsumoCarrinhoService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final ConsumoCarrinhoRepository consumoRepository;
     private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public ConsumoCarrinhoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ConsumoCarrinhoRepository consumoRepository,
-            RevisaoService revisaoService
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.consumoRepository = consumoRepository;
         this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public ConsumoCarrinhoResponse registrar(ConsumoCarrinhoRequest request) {
+        return idempotenciaService.executar(
+                request.commandId(), "CONSUMO_CARRINHO",
+                ConsumoCarrinhoResponse.class,
+                () -> registrarNovo(request), ConsumoCarrinhoResponse::revisao
+        );
+    }
+
+    private ConsumoCarrinhoResponse registrarNovo(ConsumoCarrinhoRequest request) {
         Map<String, ConsumoCarrinhoRequest.Item> solicitados =
                 validarEIndexar(request.itens());
         Estoque pessoal = estoqueRepository

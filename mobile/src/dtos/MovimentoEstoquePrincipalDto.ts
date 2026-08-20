@@ -4,6 +4,7 @@ export interface ItemMovimentoEstoquePrincipalRequestDto {
 }
 
 export interface RegistrarMovimentoEstoquePrincipalRequestDto {
+    commandId: string;
     tipo: "ENTRADA" | "SAIDA";
     itens: ItemMovimentoEstoquePrincipalRequestDto[];
     data: string;

@@ -11,7 +11,8 @@ export class DevolucaoRemotaService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "devolução",
-            () => ApiService.registrarDevolucao({
+            (commandId) => ApiService.registrarDevolucao({
+                commandId,
                 responsavelId: devolucao.responsavelId,
                 itens: devolucao.itens.map((item) => ({
                     produtoId: item.produtoId,

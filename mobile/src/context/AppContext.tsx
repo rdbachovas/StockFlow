@@ -177,6 +177,11 @@ export function AppProvider({
             throw resultado.erro;
         }
 
+        if (resultado.tipo === "POST_AMBIGUO") {
+            setEstadoSincronizacao("OFFLINE");
+            throw resultado.erro;
+        }
+
         if (resultado.tipo === "CONFIRMADA_PENDENTE_SNAPSHOT") {
             setEstadoSincronizacao("DESATUALIZADO");
             return;

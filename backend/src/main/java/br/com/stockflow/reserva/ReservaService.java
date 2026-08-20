@@ -12,6 +12,7 @@ import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,21 +40,31 @@ public class ReservaService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final ReservaRepository reservaRepository;
     private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public ReservaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
-            RevisaoService revisaoService
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public ReservaResponse criar(ReservaRequest request) {
+        return idempotenciaService.executar(
+                request.commandId(), "CRIAR_RESERVA", ReservaResponse.class,
+                () -> criarNova(request), ReservaResponse::revisao
+        );
+    }
+
+    private ReservaResponse criarNova(ReservaRequest request) {
         validarDestino(request.responsavelId(), request.destino());
         validarProduto(request.produtoId(), request.destino());
 
@@ -98,6 +109,16 @@ public class ReservaService {
 
     @Transactional
     public ReservaResponse cancelar(
+            UUID id,
+            CancelamentoReservaRequest request
+    ) {
+        return idempotenciaService.executar(
+                request.commandId(), "CANCELAR_RESERVA", ReservaResponse.class,
+                () -> cancelarNova(id, request), ReservaResponse::revisao
+        );
+    }
+
+    private ReservaResponse cancelarNova(
             UUID id,
             CancelamentoReservaRequest request
     ) {

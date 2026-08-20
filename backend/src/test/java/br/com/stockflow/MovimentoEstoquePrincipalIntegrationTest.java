@@ -17,6 +17,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.UUID;
+import java.util.concurrent.Executors;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -46,6 +50,7 @@ class MovimentoEstoquePrincipalIntegrationTest {
 
     @BeforeEach
     void prepararEstado() {
+        jdbcTemplate.update("DELETE FROM comandos_processados");
         jdbcTemplate.update("UPDATE revisao_estado SET revisao = 0 WHERE id = 1");
         jdbcTemplate.update("DELETE FROM movimento_estoque_principal_itens");
         jdbcTemplate.update("DELETE FROM movimentos_estoque_principal");
@@ -213,18 +218,81 @@ class MovimentoEstoquePrincipalIntegrationTest {
         assertThat(contagem("movimentos_estoque_principal")).isEqualTo(2);
     }
 
+    @Test
+    void mesmoCommandIdRetornaMesmaRespostaSemDuplicar() throws Exception {
+        String commandId = UUID.randomUUID().toString();
+        MvcResult primeira = movimentar(commandId, "ENTRADA", item("MIX", 10))
+                .andExpect(status().isCreated())
+                .andReturn();
+        MvcResult segunda = movimentar(commandId, "ENTRADA", item("MIX", 10))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        assertThat(segunda.getResponse().getContentAsString())
+                .isEqualTo(primeira.getResponse().getContentAsString());
+        assertThat(saldo("MIX")).isEqualTo(310);
+        assertThat(contagem("movimentos_estoque_principal")).isEqualTo(1);
+        assertThat(contagem("comandos_processados")).isEqualTo(1);
+    }
+
+    @Test
+    void commandIdsDiferentesExecutamNormalmente() throws Exception {
+        movimentar(UUID.randomUUID().toString(), "ENTRADA", item("MIX", 1));
+        movimentar(UUID.randomUUID().toString(), "ENTRADA", item("MIX", 1));
+        assertThat(saldo("MIX")).isEqualTo(302);
+        assertThat(contagem("movimentos_estoque_principal")).isEqualTo(2);
+    }
+
+    @Test
+    void requestsConcorrentesComMesmoCommandIdExecutamUmaVez() throws Exception {
+        String commandId = UUID.randomUUID().toString();
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var primeira = executor.submit(() -> movimentar(
+                    commandId, "ENTRADA", item("MIX", 10)
+            ).andReturn().getResponse().getStatus());
+            var segunda = executor.submit(() -> movimentar(
+                    commandId, "ENTRADA", item("MIX", 10)
+            ).andReturn().getResponse().getStatus());
+
+            assertThat(primeira.get()).isEqualTo(201);
+            assertThat(segunda.get()).isEqualTo(201);
+            assertThat(saldo("MIX")).isEqualTo(310);
+            assertThat(contagem("movimentos_estoque_principal")).isEqualTo(1);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void rollbackNaoConfirmaCommandId() throws Exception {
+        String commandId = UUID.randomUUID().toString();
+        movimentar(commandId, "SAIDA", item("MILHO", 51))
+                .andExpect(status().isBadRequest());
+        assertThat(contagem("comandos_processados")).isZero();
+    }
+
     private org.springframework.test.web.servlet.ResultActions movimentar(
+            String tipo,
+            String itens
+    ) throws Exception {
+        return movimentar(UUID.randomUUID().toString(), tipo, itens);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions movimentar(
+            String commandId,
             String tipo,
             String itens
     ) throws Exception {
         String corpo = """
                 {
+                    "commandId":"%s",
                     "tipo":"%s",
                     "itens":%s,
                     "data":"2026-08-11T17:00:00Z",
                     "observacao":"Movimento manual teste"
                 }
-                """.formatted(tipo, normalizarItens(itens));
+                """.formatted(commandId, tipo, normalizarItens(itens));
         return mockMvc.perform(post("/api/v1/movimentos-estoque-principal")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(corpo));

@@ -7,6 +7,7 @@ import { Reserva, StatusReserva } from "../src/models/Reserva";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { PersistenceService } from "../src/services/PersistenceService";
 import { ReservaRemotaService } from "../src/services/ReservaRemotaService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { ReservaService } from "../src/services/ReservaService";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -52,6 +53,7 @@ function preparar(snapshotOficial = snapshot()): jest.SpiedFunction<typeof ApiSe
 
 describe("reservas remotas", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("reserva");
         jest.restoreAllMocks();
     });
 
@@ -59,7 +61,7 @@ describe("reservas remotas", () => {
         const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         await ReservaRemotaService.criar(reserva(), "ONLINE");
-        expect(post).toHaveBeenCalledWith({ responsavelId: "RODRIGO", destino: "BOULEVARD", produtoId: "MIX", quantidade: 4 });
+        expect(post).toHaveBeenCalledWith({ commandId: expect.any(String), responsavelId: "RODRIGO", destino: "BOULEVARD", produtoId: "MIX", quantidade: 4 });
     });
 
     test("criação atualiza pelo snapshot", async () => {
@@ -76,6 +78,7 @@ describe("reservas remotas", () => {
         preparar();
         await ReservaRemotaService.criar(reserva("CESAR"), "ONLINE");
         expect(post).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: "CESAR",
             destino: "AEROPORTO",
             produtoId: "STITCH",
@@ -111,7 +114,7 @@ describe("reservas remotas", () => {
         const post = jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar(snapshot("CANCELADA"));
         await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
-        expect(post).toHaveBeenCalledWith("uuid-real", { responsavelId: "RODRIGO" });
+        expect(post).toHaveBeenCalledWith("uuid-real", { commandId: expect.any(String), responsavelId: "RODRIGO" });
     });
 
     test("cancelamento atualiza pelo snapshot", async () => {

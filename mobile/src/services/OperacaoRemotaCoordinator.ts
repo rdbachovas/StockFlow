@@ -3,6 +3,7 @@ import { ApiService, ErroApi } from "./ApiService";
 import { EstadoSincronizacao } from "./InicializacaoService";
 import { PersistenceService } from "./PersistenceService";
 import { SnapshotMapper } from "./SnapshotMapper";
+import { gerarCommandId } from "../utils/CommandId";
 
 export type ResultadoOperacao =
     | {
@@ -18,11 +19,16 @@ export type ResultadoOperacao =
     | {
         tipo: "CONFIRMADA_PENDENTE_SNAPSHOT";
         erro: Error;
+    }
+    | {
+        tipo: "POST_AMBIGUO";
+        commandId: string;
+        erro: Error;
     };
 
 export type ResultadoOperacaoConfirmada = Exclude<
     ResultadoOperacao,
-    { tipo: "REJEITADA" }
+    { tipo: "REJEITADA" | "POST_AMBIGUO" }
 >;
 
 type AtualizarEstado = (estado: EstadoSincronizacao) => void;
@@ -32,6 +38,10 @@ export class OperacaoRemotaCoordinator {
     private static revisaoMinimaPendente: number | undefined;
     private static maiorRevisaoAplicada = 0;
     private static operacoesEmEspera = new Set<string>();
+    private static intencoesAmbiguas = new Map<string, {
+        commandId: string;
+        post: (commandId: string) => Promise<unknown>;
+    }>();
 
     static registrarRevisaoAplicada(revisao: number): void {
         if (Number.isInteger(revisao) && revisao >= 0) {
@@ -49,9 +59,10 @@ export class OperacaoRemotaCoordinator {
     }
 
     static executar(
-        post: () => Promise<unknown>,
+        post: (commandId: string) => Promise<unknown>,
         estadoSincronizacao: EstadoSincronizacao,
-        atualizarEstado?: AtualizarEstado
+        atualizarEstado?: AtualizarEstado,
+        commandId = gerarCommandId()
     ): Promise<ResultadoOperacao> {
         return this.enfileirar(async () => {
             if (this.revisaoMinimaPendente !== undefined) {
@@ -74,8 +85,16 @@ export class OperacaoRemotaCoordinator {
             let respostaPost: unknown;
 
             try {
-                respostaPost = await post();
+                respostaPost = await post(commandId);
             } catch (erro) {
+                if (erro instanceof ErroApi && erro.status === undefined) {
+                    atualizarEstado?.("OFFLINE");
+                    return {
+                        tipo: "POST_AMBIGUO",
+                        commandId,
+                        erro
+                    };
+                }
                 atualizarEstado?.(
                     erro instanceof ErroApi && erro.status === undefined
                         ? "OFFLINE"
@@ -110,11 +129,14 @@ export class OperacaoRemotaCoordinator {
 
     static async executarParaServico(
         chaveOperacao: string,
-        post: () => Promise<unknown>,
+        post: (commandId: string) => Promise<unknown>,
         estadoSincronizacao: EstadoSincronizacao,
         atualizarEstado?: AtualizarEstado
     ): Promise<ResultadoOperacaoConfirmada> {
-        if (this.operacoesEmEspera.has(chaveOperacao)) {
+        if (
+            this.operacoesEmEspera.has(chaveOperacao) ||
+            this.intencoesAmbiguas.has(chaveOperacao)
+        ) {
             throw new Error(`Já existe uma operação de ${chaveOperacao} sendo enviada.`);
         }
 
@@ -131,11 +153,49 @@ export class OperacaoRemotaCoordinator {
             this.operacoesEmEspera.delete(chaveOperacao);
         }
 
+        if (resultado.tipo === "POST_AMBIGUO") {
+            this.intencoesAmbiguas.set(chaveOperacao, {
+                commandId: resultado.commandId,
+                post
+            });
+            throw resultado.erro;
+        }
+
         if (resultado.tipo === "REJEITADA") {
             throw resultado.erro;
         }
 
         return resultado;
+    }
+
+    static async reenviarIntencaoAmbigua(
+        chaveOperacao: string,
+        estadoSincronizacao: EstadoSincronizacao,
+        atualizarEstado?: AtualizarEstado
+    ): Promise<ResultadoOperacao> {
+        const intencao = this.intencoesAmbiguas.get(chaveOperacao);
+        if (intencao === undefined) {
+            return {
+                tipo: "REJEITADA",
+                erro: new Error("Não existe intenção ambígua para reenviar.")
+            };
+        }
+
+        const resultado = await this.executar(
+            intencao.post,
+            estadoSincronizacao,
+            atualizarEstado,
+            intencao.commandId
+        );
+
+        if (resultado.tipo !== "POST_AMBIGUO") {
+            this.intencoesAmbiguas.delete(chaveOperacao);
+        }
+        return resultado;
+    }
+
+    static descartarIntencaoAmbigua(chaveOperacao: string): void {
+        this.intencoesAmbiguas.delete(chaveOperacao);
     }
 
     static sincronizarPendente(

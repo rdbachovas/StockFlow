@@ -12,6 +12,7 @@ import { RetiradaEstoque } from "../src/models/RetiradaEstoque";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { PersistenceService } from "../src/services/PersistenceService";
 import { RetiradaRemotaService } from "../src/services/RetiradaRemotaService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { RetiradaEstoqueService } from "../src/services/RetiradaEstoqueService";
 
 jest.mock(
@@ -59,6 +60,7 @@ function snapshot(): SnapshotDto {
 
 describe("retirada remota", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("retirada");
         jest.restoreAllMocks();
     });
 

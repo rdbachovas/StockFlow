@@ -11,7 +11,8 @@ export class ReservaRemotaService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "reserva",
-            () => ApiService.criarReserva({
+            (commandId) => ApiService.criarReserva({
+                commandId,
                 responsavelId: reserva.responsavelId,
                 destino: reserva.destinoId,
                 produtoId: reserva.produtoId,
@@ -30,9 +31,9 @@ export class ReservaRemotaService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "reserva",
-            () => ApiService.cancelarReserva(
+            (commandId) => ApiService.cancelarReserva(
                 reservaId,
-                { responsavelId }
+                { commandId, responsavelId }
             ),
             estadoSincronizacao,
             atualizarEstado

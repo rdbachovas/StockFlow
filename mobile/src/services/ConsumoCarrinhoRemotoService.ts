@@ -11,7 +11,8 @@ export class ConsumoCarrinhoRemotoService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "consumo do carrinho",
-            () => ApiService.registrarConsumoCarrinho({
+            (commandId) => ApiService.registrarConsumoCarrinho({
+                commandId,
                 responsavelId: solicitacao.responsavelId,
                 itens: solicitacao.itens.map((item) => ({
                     produtoId: item.produtoId,

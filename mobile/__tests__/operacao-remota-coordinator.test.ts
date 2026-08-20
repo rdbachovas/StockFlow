@@ -35,6 +35,7 @@ function preparar(): void {
 
 describe("OperacaoRemotaCoordinator", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("teste ambíguo");
         jest.restoreAllMocks();
     });
 
@@ -185,7 +186,53 @@ describe("OperacaoRemotaCoordinator", () => {
             "ONLINE",
             (estado) => estados.push(estado)
         );
-        expect(resultado.tipo).toBe("REJEITADA");
+        expect(resultado.tipo).toBe("POST_AMBIGUO");
         expect(estados).toEqual(["SINCRONIZANDO", "OFFLINE"]);
+    });
+
+    test("retry de resultado ambíguo reutiliza o mesmo commandId", async () => {
+        preparar();
+        const commandIds: string[] = [];
+        const post = jest.fn(async (commandId: string) => {
+            commandIds.push(commandId);
+            if (commandIds.length === 1) {
+                throw new ErroApi("conexão interrompida");
+            }
+            return { revisao: 12 };
+        });
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue({
+            ...snapshot(),
+            revisao: 12
+        });
+
+        await expect(
+            OperacaoRemotaCoordinator.executarParaServico(
+                "teste ambíguo",
+                post,
+                "ONLINE"
+            )
+        ).rejects.toThrow("conexão interrompida");
+
+        const recuperado = await OperacaoRemotaCoordinator.reenviarIntencaoAmbigua(
+            "teste ambíguo",
+            "ONLINE"
+        );
+        expect(recuperado.tipo).toBe("CONFIRMADA");
+        expect(commandIds[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        expect(commandIds[1]).toBe(commandIds[0]);
+    });
+
+    test("novas intenções recebem commandIds diferentes", async () => {
+        preparar();
+        const commandIds: string[] = [];
+        const post = async (commandId: string) => {
+            commandIds.push(commandId);
+            return { revisao: 12 };
+        };
+
+        await OperacaoRemotaCoordinator.executar(post, "ONLINE");
+        await OperacaoRemotaCoordinator.executar(post, "ONLINE");
+
+        expect(commandIds[0]).not.toBe(commandIds[1]);
     });
 });

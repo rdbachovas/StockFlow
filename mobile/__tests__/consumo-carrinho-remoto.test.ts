@@ -5,6 +5,7 @@ import { SolicitacaoConsumoCarrinho } from "../src/models/ConsumoCarrinho";
 import { ProdutoId } from "../src/models/Produto";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { ConsumoCarrinhoRemotoService } from "../src/services/ConsumoCarrinhoRemotoService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { ConsumoCarrinhoService } from "../src/services/ConsumoCarrinhoService";
 import { PersistenceService } from "../src/services/PersistenceService";
 
@@ -66,6 +67,7 @@ function preparar(oficial = snapshot()): void {
 
 describe("consumo remoto do carrinho", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("consumo do carrinho");
         jest.restoreAllMocks();
     });
 
@@ -81,6 +83,7 @@ describe("consumo remoto do carrinho", () => {
         preparar();
         await ConsumoCarrinhoRemotoService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarConsumoCarrinho).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: entrada.responsavelId,
             itens: entrada.itens,
             data: "2026-08-18T15:00:00.000Z",

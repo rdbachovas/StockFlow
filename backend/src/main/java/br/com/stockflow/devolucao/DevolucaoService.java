@@ -14,6 +14,7 @@ import br.com.stockflow.reserva.DestinoReserva;
 import br.com.stockflow.reserva.Reserva;
 import br.com.stockflow.reserva.ReservaRepository;
 import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,23 +28,33 @@ public class DevolucaoService {
     private final ReservaRepository reservaRepository;
     private final DevolucaoRepository devolucaoRepository;
     private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public DevolucaoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
             DevolucaoRepository devolucaoRepository,
-            RevisaoService revisaoService
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.devolucaoRepository = devolucaoRepository;
         this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public DevolucaoResponse registrar(DevolucaoRequest request) {
+        return idempotenciaService.executar(
+                request.commandId(), "DEVOLUCAO", DevolucaoResponse.class,
+                () -> registrarNova(request), DevolucaoResponse::revisao
+        );
+    }
+
+    private DevolucaoResponse registrarNova(DevolucaoRequest request) {
         Map<String, ItemSolicitado> solicitados = validarEIndexar(request);
         Estoque pessoal = estoqueRepository
                 .findByResponsavelId(request.responsavelId())

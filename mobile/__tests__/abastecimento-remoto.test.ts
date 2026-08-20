@@ -6,6 +6,7 @@ import { LocalId } from "../src/models/Local";
 import { MaquinaId } from "../src/models/Maquina";
 import { ProdutoId } from "../src/models/Produto";
 import { AbastecimentoRemotoService } from "../src/services/AbastecimentoRemotoService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { AbastecimentoService } from "../src/services/AbastecimentoService";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { PersistenceService } from "../src/services/PersistenceService";
@@ -73,6 +74,7 @@ function preparar(): void {
 
 describe("abastecimento remoto", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("abastecimento");
         jest.restoreAllMocks();
     });
 
@@ -80,6 +82,7 @@ describe("abastecimento remoto", () => {
         preparar();
         await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: "RODRIGO", local: "BOULEVARD",
             itens: [{ maquinaId: "M1", produtoId: "MIX", quantidade: 4 }],
             data: "2026-08-17T12:00:00.000Z", observacao: "Reposição"

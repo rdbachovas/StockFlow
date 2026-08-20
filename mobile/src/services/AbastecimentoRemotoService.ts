@@ -11,7 +11,8 @@ export class AbastecimentoRemotoService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "abastecimento",
-            () => ApiService.registrarAbastecimento({
+            (commandId) => ApiService.registrarAbastecimento({
+                commandId,
                 responsavelId: abastecimento.responsavelId,
                 local: abastecimento.localId,
                 itens: abastecimento.itens.map((item) => ({ ...item })),

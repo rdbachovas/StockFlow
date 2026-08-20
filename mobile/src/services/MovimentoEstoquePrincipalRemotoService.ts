@@ -11,7 +11,8 @@ export class MovimentoEstoquePrincipalRemotoService {
     ): Promise<ResultadoOperacaoConfirmada> {
         return await OperacaoRemotaCoordinator.executarParaServico(
             "movimento do Estoque Principal",
-            () => ApiService.registrarMovimentoEstoquePrincipal({
+            (commandId) => ApiService.registrarMovimentoEstoquePrincipal({
+                commandId,
                 tipo: solicitacao.tipo,
                 itens: solicitacao.itens.map((item) => ({
                     produtoId: item.produtoId,

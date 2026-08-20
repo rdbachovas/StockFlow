@@ -1,4 +1,5 @@
 export interface RegistrarAbastecimentoRequestDto {
+    commandId: string;
     responsavelId: string;
     local: string;
     itens: Array<{

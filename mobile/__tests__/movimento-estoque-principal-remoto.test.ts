@@ -8,6 +8,7 @@ import {
 import { ProdutoId } from "../src/models/Produto";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { MovimentoEstoquePrincipalRemotoService } from "../src/services/MovimentoEstoquePrincipalRemotoService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { MovimentoEstoquePrincipalService } from "../src/services/MovimentoEstoquePrincipalService";
 import { PersistenceService } from "../src/services/PersistenceService";
 
@@ -69,6 +70,7 @@ function preparar(oficial = snapshot()): void {
 
 describe("movimento remoto do Estoque Principal", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("movimento do Estoque Principal");
         jest.restoreAllMocks();
     });
 
@@ -81,6 +83,7 @@ describe("movimento remoto do Estoque Principal", () => {
         preparar();
         await MovimentoEstoquePrincipalRemotoService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarMovimentoEstoquePrincipal).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             tipo: entrada.tipo,
             itens: entrada.itens,
             data: "2026-08-18T14:00:00.000Z",
