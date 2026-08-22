@@ -18,3 +18,12 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+stockflow:
+  auth:
+    jwt-secret: ${AUTH_JWT_SECRET:}
+    access-token-seconds: ${AUTH_ACCESS_TOKEN_SECONDS:900}
+    refresh-token-seconds: ${AUTH_REFRESH_TOKEN_SECONDS:2592000}
+    initial-passwords:
+      rodrigo: ${AUTH_INITIAL_PASSWORD_RODRIGO:}
+      cesar: ${AUTH_INITIAL_PASSWORD_CESAR:}

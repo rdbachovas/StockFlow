@@ -29,6 +29,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class MovimentoEstoquePrincipalIntegrationTest {
 
     @Container
@@ -76,7 +77,8 @@ class MovimentoEstoquePrincipalIntegrationTest {
 
     @Test
     void revisaoComecaEmZeroECresceComOperacoesConfirmadas() throws Exception {
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revisao").value(0));
 
@@ -87,7 +89,8 @@ class MovimentoEstoquePrincipalIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.revisao").value(2));
 
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revisao").value(2))
                 .andExpect(jsonPath("$.estoques[?(@.id == 'ESTOQUE_PRINCIPAL')].itens[?(@.produtoId == 'MIX')].quantidade")
@@ -99,7 +102,8 @@ class MovimentoEstoquePrincipalIntegrationTest {
         movimentar("SAIDA", item("MILHO", 51))
                 .andExpect(status().isBadRequest());
 
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revisao").value(0));
     }
@@ -294,6 +298,7 @@ class MovimentoEstoquePrincipalIntegrationTest {
                 }
                 """.formatted(commandId, tipo, normalizarItens(itens));
         return mockMvc.perform(post("/api/v1/movimentos-estoque-principal")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(corpo));
     }

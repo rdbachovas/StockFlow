@@ -1,5 +1,8 @@
 package br.com.stockflow.idempotencia;
 
+import br.com.stockflow.auth.IdentidadeAtual;
+import br.com.stockflow.usuario.Usuario;
+import br.com.stockflow.usuario.UsuarioRepository;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -8,6 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,15 +21,21 @@ public class IdempotenciaService {
     private final ComandoProcessadoRepository repository;
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final IdentidadeAtual identidadeAtual;
+    private final UsuarioRepository usuarioRepository;
 
     public IdempotenciaService(
             ComandoProcessadoRepository repository,
             JdbcTemplate jdbcTemplate,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            IdentidadeAtual identidadeAtual,
+            UsuarioRepository usuarioRepository
     ) {
         this.repository = repository;
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.identidadeAtual = identidadeAtual;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -36,12 +46,18 @@ public class IdempotenciaService {
             Supplier<T> operacao,
             java.util.function.ToLongFunction<T> obterRevisao
     ) {
+        Usuario usuario = usuarioRepository.findById(identidadeAtual.id())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Usuário autenticado não encontrado."
+                ));
         bloquear(commandId);
 
         return repository.findById(commandId)
-                .map(comando -> restaurar(comando, tipoOperacao, tipoResposta))
+                .map(comando -> restaurar(
+                        comando, usuario, tipoOperacao, tipoResposta
+                ))
                 .orElseGet(() -> processar(
-                        commandId,
+                        commandId, usuario,
                         tipoOperacao,
                         operacao,
                         obterRevisao
@@ -66,6 +82,7 @@ public class IdempotenciaService {
 
     private <T> T processar(
             UUID commandId,
+            Usuario usuario,
             String tipoOperacao,
             Supplier<T> operacao,
             java.util.function.ToLongFunction<T> obterRevisao
@@ -74,6 +91,7 @@ public class IdempotenciaService {
         String json = serializar(resposta);
         repository.save(new ComandoProcessado(
                 commandId,
+                usuario,
                 tipoOperacao,
                 obterRevisao.applyAsLong(resposta),
                 json
@@ -83,9 +101,16 @@ public class IdempotenciaService {
 
     private <T> T restaurar(
             ComandoProcessado comando,
+            Usuario usuario,
             String tipoOperacao,
             Class<T> tipoResposta
     ) {
+        if (comando.getUsuario() == null
+                || !comando.getUsuario().getId().equals(usuario.getId())) {
+            throw new AccessDeniedException(
+                    "commandId já utilizado por outro usuário."
+            );
+        }
         if (!comando.getTipoOperacao().equals(tipoOperacao)) {
             throw new IllegalArgumentException(
                     "commandId já utilizado por outra operação."

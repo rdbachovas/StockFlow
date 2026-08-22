@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class RetiradaIntegrationTest {
 
     @Container
@@ -67,6 +68,7 @@ class RetiradaIntegrationTest {
     @Test
     void registraRetiradaParaRodrigo() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens("MIX", 10))))
                 .andExpect(status().isCreated())
@@ -82,6 +84,7 @@ class RetiradaIntegrationTest {
     @Test
     void registraRetiradaParaCesar() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("CESAR"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("CESAR", itens("BIG", 4))))
                 .andExpect(status().isCreated())
@@ -101,6 +104,7 @@ class RetiradaIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens)))
                 .andExpect(status().isCreated())
@@ -117,6 +121,7 @@ class RetiradaIntegrationTest {
     @Test
     void rejeitaEstoqueInsuficiente() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens("MIX", 301))))
                 .andExpect(status().isBadRequest());
@@ -128,6 +133,7 @@ class RetiradaIntegrationTest {
     @Test
     void rejeitaQuantidadeInvalida() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens("MIX", 0))))
                 .andExpect(status().isBadRequest());
@@ -146,6 +152,7 @@ class RetiradaIntegrationTest {
                 """;
 
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens)))
                 .andExpect(status().isBadRequest());
@@ -159,6 +166,7 @@ class RetiradaIntegrationTest {
     @Test
     void preservaDataEObservacaoNoHistoricoAgregado() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("CESAR"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("CESAR", itens("MIX", 5))))
                 .andExpect(status().isCreated())
@@ -184,6 +192,7 @@ class RetiradaIntegrationTest {
     @Test
     void registraSaldoAnteriorEPosterior() throws Exception {
         mockMvc.perform(post("/api/v1/retiradas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens("MIX", 9))))
                 .andExpect(status().isCreated())

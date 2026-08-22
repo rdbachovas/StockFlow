@@ -1,0 +1,8 @@
+stockflow:
+  auth:
+    jwt-secret: "segredo-exclusivo-para-testes-com-mais-de-32-bytes"
+    access-token-seconds: 900
+    refresh-token-seconds: 2592000
+    initial-passwords:
+      rodrigo: "senha-teste-rodrigo"
+      cesar: "senha-teste-cesar"

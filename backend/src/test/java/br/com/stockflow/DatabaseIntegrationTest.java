@@ -27,6 +27,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class DatabaseIntegrationTest {
 
     @Container
@@ -71,7 +72,7 @@ class DatabaseIntegrationTest {
         );
 
         assertThat(itensDoPrincipal).isEqualTo(12);
-        assertThat(migrations).isEqualTo(11);
+        assertThat(migrations).isEqualTo(14);
     }
 
     @Test
@@ -103,7 +104,8 @@ class DatabaseIntegrationTest {
 
     @Test
     void estoquesRetornamSeedComItensDoPrincipal() throws Exception {
-        mockMvc.perform(get("/api/v1/estoques"))
+        mockMvc.perform(get("/api/v1/estoques")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].id").value("ESTOQUE_CESAR"))

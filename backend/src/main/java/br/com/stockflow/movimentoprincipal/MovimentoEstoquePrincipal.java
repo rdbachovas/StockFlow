@@ -1,5 +1,6 @@
 package br.com.stockflow.movimentoprincipal;
 
+import br.com.stockflow.usuario.Usuario;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,9 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -31,6 +35,10 @@ public class MovimentoEstoquePrincipal {
     @Column(length = 500)
     private String observacao;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
+
     @OneToMany(mappedBy = "movimento", cascade = CascadeType.ALL)
     private List<MovimentoEstoquePrincipalItem> itens = new ArrayList<>();
 
@@ -39,11 +47,13 @@ public class MovimentoEstoquePrincipal {
 
     public MovimentoEstoquePrincipal(
             TipoMovimentoEstoquePrincipal tipo,
+            Usuario usuario,
             OffsetDateTime data,
             String observacao
     ) {
         this.id = UUID.randomUUID();
         this.tipo = tipo;
+        this.usuario = usuario;
         this.data = data;
         this.observacao = observacao;
     }
@@ -56,6 +66,7 @@ public class MovimentoEstoquePrincipal {
     public TipoMovimentoEstoquePrincipal getTipo() { return tipo; }
     public OffsetDateTime getData() { return data; }
     public String getObservacao() { return observacao; }
+    public Usuario getUsuario() { return usuario; }
     public List<MovimentoEstoquePrincipalItem> getItens() {
         return List.copyOf(itens);
     }

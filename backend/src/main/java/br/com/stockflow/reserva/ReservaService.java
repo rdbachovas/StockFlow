@@ -1,5 +1,6 @@
 package br.com.stockflow.reserva;
 
+import br.com.stockflow.auth.IdentidadeAtual;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
@@ -41,23 +42,27 @@ public class ReservaService {
     private final ReservaRepository reservaRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
 
     public ReservaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
     }
 
     @Transactional
     public ReservaResponse criar(ReservaRequest request) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "CRIAR_RESERVA", ReservaResponse.class,
                 () -> criarNova(request), ReservaResponse::revisao
@@ -112,6 +117,7 @@ public class ReservaService {
             UUID id,
             CancelamentoReservaRequest request
     ) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "CANCELAR_RESERVA", ReservaResponse.class,
                 () -> cancelarNova(id, request), ReservaResponse::revisao

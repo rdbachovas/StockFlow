@@ -1,5 +1,6 @@
 package br.com.stockflow.devolucao;
 
+import br.com.stockflow.auth.IdentidadeAtual;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -29,6 +30,7 @@ public class DevolucaoService {
     private final DevolucaoRepository devolucaoRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
 
     public DevolucaoService(
             EstoqueRepository estoqueRepository,
@@ -36,7 +38,8 @@ public class DevolucaoService {
             ReservaRepository reservaRepository,
             DevolucaoRepository devolucaoRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
@@ -44,10 +47,12 @@ public class DevolucaoService {
         this.devolucaoRepository = devolucaoRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
     }
 
     @Transactional
     public DevolucaoResponse registrar(DevolucaoRequest request) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "DEVOLUCAO", DevolucaoResponse.class,
                 () -> registrarNova(request), DevolucaoResponse::revisao

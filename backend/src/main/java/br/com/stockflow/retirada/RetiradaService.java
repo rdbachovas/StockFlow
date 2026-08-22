@@ -1,5 +1,6 @@
 package br.com.stockflow.retirada;
 
+import br.com.stockflow.auth.IdentidadeAtual;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,23 +25,27 @@ public class RetiradaService {
     private final RetiradaRepository retiradaRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
 
     public RetiradaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             RetiradaRepository retiradaRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.retiradaRepository = retiradaRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
     }
 
     @Transactional
     public RetiradaResponse registrar(RetiradaRequest request) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "RETIRADA", RetiradaResponse.class,
                 () -> registrarNova(request), RetiradaResponse::revisao

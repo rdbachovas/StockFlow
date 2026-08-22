@@ -1,5 +1,6 @@
 package br.com.stockflow.abastecimento;
 
+import br.com.stockflow.auth.IdentidadeAtual;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -42,6 +43,7 @@ public class AbastecimentoService {
     private final AbastecimentoRepository abastecimentoRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
 
     public AbastecimentoService(
             EstoqueRepository estoqueRepository,
@@ -49,7 +51,8 @@ public class AbastecimentoService {
             ReservaRepository reservaRepository,
             AbastecimentoRepository abastecimentoRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
@@ -57,10 +60,12 @@ public class AbastecimentoService {
         this.abastecimentoRepository = abastecimentoRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
     }
 
     @Transactional
     public AbastecimentoResponse registrar(AbastecimentoRequest request) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "ABASTECIMENTO", AbastecimentoResponse.class,
                 () -> registrarNovo(request), AbastecimentoResponse::revisao

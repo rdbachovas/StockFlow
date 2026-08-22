@@ -1,5 +1,8 @@
 package br.com.stockflow.movimentoprincipal;
 
+import br.com.stockflow.auth.IdentidadeAtual;
+import br.com.stockflow.usuario.Usuario;
+import br.com.stockflow.usuario.UsuarioRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,17 +23,23 @@ public class MovimentoEstoquePrincipalService {
     private final MovimentoEstoquePrincipalRepository movimentoRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
+    private final UsuarioRepository usuarioRepository;
 
     public MovimentoEstoquePrincipalService(
             EstoqueItemRepository estoqueItemRepository,
             MovimentoEstoquePrincipalRepository movimentoRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual,
+            UsuarioRepository usuarioRepository
     ) {
         this.estoqueItemRepository = estoqueItemRepository;
         this.movimentoRepository = movimentoRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Transactional
@@ -61,6 +70,7 @@ public class MovimentoEstoquePrincipalService {
 
         MovimentoEstoquePrincipal movimento = new MovimentoEstoquePrincipal(
                 request.tipo(),
+                usuarioAutenticado(),
                 request.data(),
                 request.observacao()
         );
@@ -86,6 +96,13 @@ public class MovimentoEstoquePrincipalService {
                 movimentoRepository.save(movimento),
                 revisaoService.avancar()
         );
+    }
+
+    private Usuario usuarioAutenticado() {
+        return usuarioRepository.findById(identidadeAtual.id())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Usuário autenticado não encontrado."
+                ));
     }
 
     private Map<String, MovimentoEstoquePrincipalRequest.Item> validarEIndexar(

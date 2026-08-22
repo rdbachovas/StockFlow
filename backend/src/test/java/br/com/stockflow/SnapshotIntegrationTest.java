@@ -25,6 +25,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class SnapshotIntegrationTest {
 
     @Container
@@ -88,7 +89,7 @@ class SnapshotIntegrationTest {
 
     @Test
     void retornaOsTresEstoques() throws Exception {
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revisao").isNumber())
                 .andExpect(jsonPath("$.estoques.length()").value(3))
@@ -102,7 +103,7 @@ class SnapshotIntegrationTest {
 
     @Test
     void retornaProdutosESaldos() throws Exception {
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estoques[1].itens[?(@.produtoId == 'MIX')].quantidade")
                         .value(300))
@@ -117,7 +118,7 @@ class SnapshotIntegrationTest {
         criarReserva("RODRIGO", "BOULEVARD", "MIX", 20);
         abastecer("RODRIGO", "BOULEVARD", "M1", "MIX", 5);
 
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reservas[0].quantidadeUtilizada")
                         .value(5))
@@ -135,7 +136,7 @@ class SnapshotIntegrationTest {
                     {"produtoId":"MIX","quantidade":10}
                 ],"data":"2026-08-11T10:00:00Z","observacao":"R"}
                 """);
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.retiradas[0].responsavelId")
                         .value("RODRIGO"))
@@ -146,7 +147,7 @@ class SnapshotIntegrationTest {
     @Test
     void retornaAbastecimento() throws Exception {
         abastecer("RODRIGO", "BOULEVARD", "M1", "MIX", 5);
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.abastecimentos[0].local")
                         .value("BOULEVARD"))
@@ -167,7 +168,7 @@ class SnapshotIntegrationTest {
                 2
         );
 
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.abastecimentos[0].local")
                         .value("SUPERMERCADO_FANTE"))
@@ -186,7 +187,7 @@ class SnapshotIntegrationTest {
                     {"produtoId":"MIX","quantidadeLivre":5,"reservas":[]}
                 ],"data":"2026-08-11T12:00:00Z","observacao":"D"}
                 """);
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.devolucoes[0].estoqueDestinoId")
                         .value("ESTOQUE_PRINCIPAL"))
@@ -197,7 +198,7 @@ class SnapshotIntegrationTest {
     @Test
     void retornaMovimentoDoPrincipal() throws Exception {
         movimentoPrincipal("ENTRADA", "MIX", 7);
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.movimentosEstoquePrincipal[0].tipo")
                         .value("ENTRADA"))
@@ -208,7 +209,7 @@ class SnapshotIntegrationTest {
     @Test
     void retornaConsumoDoCarrinho() throws Exception {
         consumir("RODRIGO", "MILHO", 4);
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.consumosCarrinho[0].responsavelId")
                         .value("RODRIGO"))
@@ -218,7 +219,7 @@ class SnapshotIntegrationTest {
 
     @Test
     void retornaHistoricosVaziosSemOperacoes() throws Exception {
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reservas.length()").value(0))
                 .andExpect(jsonPath("$.retiradas.length()").value(0))
@@ -246,7 +247,7 @@ class SnapshotIntegrationTest {
                 ],"data":"2026-08-11T15:00:00Z","observacao":"D"}
                 """);
 
-        mockMvc.perform(get("/api/v1/snapshot"))
+        mockMvc.perform(get("/api/v1/snapshot").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reservas.length()").value(1))
                 .andExpect(jsonPath("$.retiradas.length()").value(1))
@@ -317,6 +318,7 @@ class SnapshotIntegrationTest {
 
     private void postJson(String endpoint, String corpo) throws Exception {
         mockMvc.perform(post(endpoint)
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(corpo))
                 .andExpect(status().isCreated());

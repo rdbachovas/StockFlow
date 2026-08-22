@@ -24,6 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class ConsumoCarrinhoIntegrationTest {
 
     @Container
@@ -248,6 +249,7 @@ class ConsumoCarrinhoIntegrationTest {
                 }
                 """.formatted(responsavelId, normalizarItens(itens));
         return mockMvc.perform(post("/api/v1/consumos-carrinho")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(responsavelId))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(corpo));
     }
@@ -267,6 +269,7 @@ class ConsumoCarrinhoIntegrationTest {
                 }
                 """.formatted(responsavel, destino, produto, quantidade);
         mockMvc.perform(post("/api/v1/reservas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(responsavel))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(corpo))
                 .andExpect(status().isCreated());

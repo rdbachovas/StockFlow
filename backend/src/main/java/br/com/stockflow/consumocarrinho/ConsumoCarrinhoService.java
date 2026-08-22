@@ -1,5 +1,6 @@
 package br.com.stockflow.consumocarrinho;
 
+import br.com.stockflow.auth.IdentidadeAtual;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,23 +31,27 @@ public class ConsumoCarrinhoService {
     private final ConsumoCarrinhoRepository consumoRepository;
     private final RevisaoService revisaoService;
     private final IdempotenciaService idempotenciaService;
+    private final IdentidadeAtual identidadeAtual;
 
     public ConsumoCarrinhoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ConsumoCarrinhoRepository consumoRepository,
             RevisaoService revisaoService,
-            IdempotenciaService idempotenciaService
+            IdempotenciaService idempotenciaService,
+            IdentidadeAtual identidadeAtual
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.consumoRepository = consumoRepository;
         this.revisaoService = revisaoService;
         this.idempotenciaService = idempotenciaService;
+        this.identidadeAtual = identidadeAtual;
     }
 
     @Transactional
     public ConsumoCarrinhoResponse registrar(ConsumoCarrinhoRequest request) {
+        identidadeAtual.exigirIgual(request.responsavelId());
         return idempotenciaService.executar(
                 request.commandId(), "CONSUMO_CARRINHO",
                 ConsumoCarrinhoResponse.class,

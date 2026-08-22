@@ -1,5 +1,6 @@
 package br.com.stockflow.idempotencia;
 
+import br.com.stockflow.usuario.Usuario;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -7,6 +8,9 @@ import java.util.UUID;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 @Table(name = "comandos_processados")
@@ -14,6 +18,10 @@ public class ComandoProcessado {
 
     @Id
     private UUID commandId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
 
     private String tipoOperacao;
 
@@ -28,11 +36,13 @@ public class ComandoProcessado {
 
     public ComandoProcessado(
             UUID commandId,
+            Usuario usuario,
             String tipoOperacao,
             long revisao,
             String respostaJson
     ) {
         this.commandId = commandId;
+        this.usuario = usuario;
         this.tipoOperacao = tipoOperacao;
         this.revisao = revisao;
         this.respostaJson = respostaJson;
@@ -42,6 +52,8 @@ public class ComandoProcessado {
     public String getTipoOperacao() {
         return tipoOperacao;
     }
+
+    public Usuario getUsuario() { return usuario; }
 
     public String getRespostaJson() {
         return respostaJson;

@@ -28,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Testcontainers
+@org.springframework.security.test.context.support.WithMockUser(username = "RODRIGO")
 class DevolucaoIntegrationTest {
 
     @Container
@@ -282,6 +283,7 @@ class DevolucaoIntegrationTest {
                 }
                 """.formatted(responsavel, normalizarItens(itens));
         return mockMvc.perform(post("/api/v1/devolucoes")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(responsavel))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(corpo));
     }
@@ -301,6 +303,7 @@ class DevolucaoIntegrationTest {
                 }
                 """.formatted(responsavel, destino, produto, quantidade);
         String resposta = mockMvc.perform(post("/api/v1/reservas")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(responsavel))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(corpo))
                 .andExpect(status().isCreated())
