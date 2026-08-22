@@ -17,6 +17,7 @@ import { Section } from "../components/layout/Section";
 import { Card } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import { useAuth } from "../context/AuthContext";
 import {
     ControlSize,
     Palette,
@@ -44,7 +45,8 @@ export function ConsumoCarrinhoScreen({
     estoqueCesar,
     registrarConsumo
 }: Props) {
-    const [responsavel, setResponsavel] = useState<UsuarioId>(UsuarioId.RODRIGO);
+    const { usuario } = useAuth();
+    const responsavel = usuario!.id;
     const [quantidades, setQuantidades] = useState<Record<string, string>>({});
     const [observacao, setObservacao] = useState("");
     const [erro, setErro] = useState<string | null>(null);
@@ -62,13 +64,6 @@ export function ConsumoCarrinhoScreen({
         [quantidades]
     );
     const total = itens.reduce((soma, item) => soma + item.quantidade, 0);
-
-    const trocarResponsavel = (novoResponsavel: UsuarioId) => {
-        setResponsavel(novoResponsavel);
-        setQuantidades({});
-        setErro(null);
-        setSucesso(null);
-    };
 
     const confirmar = async () => {
         if (enviando) {
@@ -109,10 +104,7 @@ export function ConsumoCarrinhoScreen({
                 <Text style={styles.subtitle}>Registre somente os insumos utilizados.</Text>
 
                 <Section title="Responsável">
-                    <View style={styles.chips}>
-                        <Chip label="Rodrigo" selected={responsavel === UsuarioId.RODRIGO} onPress={() => trocarResponsavel(UsuarioId.RODRIGO)} />
-                        <Chip label="Cesar" selected={responsavel === UsuarioId.CESAR} onPress={() => trocarResponsavel(UsuarioId.CESAR)} />
-                    </View>
+                    <Text style={styles.subtitle}>{usuario!.nome}</Text>
                 </Section>
 
                 <Section title="Insumos">

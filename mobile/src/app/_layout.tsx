@@ -7,13 +7,41 @@ import {
 import {
     AppProvider
 } from "../context/AppContext";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 
 export default function RootLayout() {
+
+    return (
+        <AuthProvider>
+            <AuthenticatedLayout />
+        </AuthProvider>
+    );
+}
+
+function AuthenticatedLayout() {
+    const { estado } = useAuth();
+
+    if (estado === "CARREGANDO") {
+        return null;
+    }
+
+    if (estado === "NAO_AUTENTICADO") {
+        return (
+            <Stack>
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+            </Stack>
+        );
+    }
 
     return (
         <AppProvider>
 
             <Stack>
+
+                <Stack.Screen
+                    name="login"
+                    options={{ headerShown: false }}
+                />
 
                 <Stack.Screen
                     name="(tabs)"

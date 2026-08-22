@@ -20,6 +20,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import { useAuth } from "../context/AuthContext";
 import {
     ControlSize,
     Palette,
@@ -60,7 +61,8 @@ export function EstoquePrincipalScreen({
     const sendingRef = useRef(false);
     const [withdrawing, setWithdrawing] = useState(false);
     const [group, setGroup] = useState<ProductGroup>("PELUCIAS");
-    const [responsible, setResponsible] = useState<UsuarioId>(UsuarioId.RODRIGO);
+    const { usuario } = useAuth();
+    const responsible = usuario!.id;
     const [quantities, setQuantities] = useState<Record<string, string>>({});
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
@@ -154,10 +156,7 @@ export function EstoquePrincipalScreen({
                 <Text style={styles.subtitle}>Transfira itens do Principal para um estoque pessoal.</Text>
 
                 <Section title="Destino">
-                    <View style={styles.chips}>
-                        <Chip label="Rodrigo" selected={responsible === UsuarioId.RODRIGO} onPress={() => setResponsible(UsuarioId.RODRIGO)} />
-                        <Chip label="Cesar" selected={responsible === UsuarioId.CESAR} onPress={() => setResponsible(UsuarioId.CESAR)} />
-                    </View>
+                    <Text style={styles.subtitle}>{usuario!.nome}</Text>
                 </Section>
 
                 <Section title="Produtos" description="Informe somente as quantidades que serão retiradas.">

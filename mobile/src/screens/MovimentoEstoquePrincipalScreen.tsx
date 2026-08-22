@@ -17,6 +17,7 @@ import { Section } from "../components/layout/Section";
 import { Card } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import { useAuth } from "../context/AuthContext";
 import {
     Palette,
     Radius,
@@ -29,7 +30,6 @@ import {
     TipoMovimentoEstoquePrincipal
 } from "../models/MovimentoEstoquePrincipal";
 import { ProdutoId } from "../models/Produto";
-import { UsuarioId } from "../models/Usuario";
 import {
     nomeProduto,
     PRODUTOS_CARRINHO,
@@ -46,7 +46,8 @@ type Grupo = "PELUCIAS" | "CARRINHO";
 export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMovimento }: Props) {
     const [tipo, setTipo] = useState<TipoMovimentoEstoquePrincipal>(TipoMovimentoEstoquePrincipal.ENTRADA);
     const [grupo, setGrupo] = useState<Grupo>("PELUCIAS");
-    const [responsavel, setResponsavel] = useState<UsuarioId>(UsuarioId.RODRIGO);
+    const { usuario } = useAuth();
+    const responsavel = usuario!.id;
     const [quantidades, setQuantidades] = useState<Record<string, string>>({});
     const [observacao, setObservacao] = useState("");
     const [sucesso, setSucesso] = useState<string | null>(null);
@@ -117,10 +118,7 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
                 </Section>
 
                 <Section title="Responsável">
-                    <View style={styles.chips}>
-                        <Chip label="Rodrigo" selected={responsavel === UsuarioId.RODRIGO} onPress={() => setResponsavel(UsuarioId.RODRIGO)} />
-                        <Chip label="Cesar" selected={responsavel === UsuarioId.CESAR} onPress={() => setResponsavel(UsuarioId.CESAR)} />
-                    </View>
+                    <Text style={styles.subtitle}>{usuario!.nome}</Text>
                 </Section>
 
                 <Section title="Produtos">

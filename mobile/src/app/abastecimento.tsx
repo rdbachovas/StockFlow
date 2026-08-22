@@ -24,6 +24,7 @@ import {
     Typography
 } from "../constants/theme";
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { LocalId } from "../models/Local";
 import { UsuarioId } from "../models/Usuario";
 import { AbastecimentoLocalScreen } from "../screens/AbastecimentoLocalScreen";
@@ -46,18 +47,23 @@ export default function SupplyPage() {
     const { localId } = useLocalSearchParams<{ localId?: string }>();
     const [busca, setBusca] = useState("");
     const { estoqueRodrigo, estoqueCesar, reservas, registrarAbastecimento } = useApp();
-    const selecionado = locais.find((local) => local.id === localId);
+    const { usuario } = useAuth();
+    const locaisPermitidos = locais.filter((local) => !local.destaque ||
+        (usuario!.id === UsuarioId.RODRIGO && local.id === LocalId.BOULEVARD) ||
+        (usuario!.id === UsuarioId.CESAR && local.id === LocalId.AEROPORTO)
+    );
+    const selecionado = locaisPermitidos.find((local) => local.id === localId);
     const alterarLocal = () => router.setParams({ localId: undefined });
 
     if (!selecionado) {
         const termo = busca.trim().toLocaleLowerCase("pt-BR");
-        const mercados = locais.filter((local) => !local.destaque && local.nome.toLocaleLowerCase("pt-BR").includes(termo));
+        const mercados = locaisPermitidos.filter((local) => !local.destaque && local.nome.toLocaleLowerCase("pt-BR").includes(termo));
         return (
             <Screen>
                 <Text style={styles.subtitle}>1. Escolha o local do abastecimento.</Text>
                 <Section title="Locais principais">
                     <View style={styles.highlighted}>
-                        {locais.filter((local) => local.destaque).map((local) => (
+                        {locaisPermitidos.filter((local) => local.destaque).map((local) => (
                             <Card key={local.id} onPress={() => router.setParams({ localId: local.id })} style={styles.highlightCard} accessibilityLabel={`Abastecer ${local.nome}`}>
                                 <Text style={styles.highlightTitle}>{local.nome}</Text>
                                 <Text style={styles.highlightAction}>Continuar ›</Text>
@@ -81,13 +87,13 @@ export default function SupplyPage() {
     }
 
     if (selecionado.id === LocalId.BOULEVARD || selecionado.id === LocalId.AEROPORTO) {
-        const boulevard = selecionado.id === LocalId.BOULEVARD;
+        const rodrigo = usuario!.id === UsuarioId.RODRIGO;
         return (
             <AbastecimentoLocalScreen
                 localId={selecionado.id}
                 localNome={selecionado.nome}
-                responsavelId={boulevard ? UsuarioId.RODRIGO : UsuarioId.CESAR}
-                estoque={boulevard ? estoqueRodrigo : estoqueCesar}
+                responsavelId={usuario!.id}
+                estoque={rodrigo ? estoqueRodrigo : estoqueCesar}
                 reservas={reservas}
                 registrarAbastecimento={registrarAbastecimento}
                 onChangeLocal={alterarLocal}

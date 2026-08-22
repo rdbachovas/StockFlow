@@ -13,7 +13,8 @@ export type StatusComandoPendente =
     | "ENVIANDO"
     | "CONFIRMADO"
     | "ERRO"
-    | "CONFLITO";
+    | "CONFLITO"
+    | "REQUER_ATENCAO";
 
 export type ComandoPendente =
     | Comando<"RETIRADA", RegistrarRetiradaRequestDto>
@@ -26,6 +27,7 @@ export type ComandoPendente =
 
 interface Comando<Tipo extends string, Payload> {
     commandId: string;
+    usuarioIdCriador?: string;
     tipo: Tipo;
     payload: Payload;
     dataCriacao: string;

@@ -30,6 +30,7 @@ import {
     Typography
 } from "../constants/theme";
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { DestinoReservaId } from "../models/DestinoReserva";
 import { ProdutoId } from "../models/Produto";
 import {
@@ -60,10 +61,12 @@ export function ReservasScreen() {
         criarReserva,
         cancelarReserva
     } = useApp();
+    const { usuario } = useAuth();
+    const responsavel = usuario!.id;
+    const destinoInicial = ReservaService.listarDestinosPermitidos(responsavel)[0];
     const [area, setArea] = useState<Area>("ATIVAS");
-    const [responsavel, setResponsavel] = useState<UsuarioId>(UsuarioId.RODRIGO);
-    const [destino, setDestino] = useState<DestinoReservaId>(DestinoReservaId.BOULEVARD);
-    const [produto, setProduto] = useState<ProdutoId>(ProdutoId.MIX);
+    const [destino, setDestino] = useState<DestinoReservaId>(destinoInicial);
+    const [produto, setProduto] = useState<ProdutoId>(ReservaService.listarProdutosPermitidos(destinoInicial)[0]);
     const [quantidade, setQuantidade] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
@@ -76,18 +79,9 @@ export function ReservasScreen() {
     const destinos = useMemo(() => ReservaService.listarDestinosPermitidos(responsavel), [responsavel]);
     const produtos = useMemo(() => ReservaService.listarProdutosPermitidos(destino), [destino]);
     const livre = ReservaService.quantidadeDisponivel(estoque, reservas, produto);
-    const ativas = reservas.filter((reserva) => reserva.status === StatusReserva.ATIVA);
-
-    const trocarResponsavel = (novo: UsuarioId) => {
-        const novosDestinos = ReservaService.listarDestinosPermitidos(novo);
-        const novoDestino = novosDestinos[0];
-        setResponsavel(novo);
-        setDestino(novoDestino);
-        setProduto(ReservaService.listarProdutosPermitidos(novoDestino)[0]);
-        setQuantidade("");
-        setMensagemErro(null);
-        setMensagemSucesso(null);
-    };
+    const ativas = reservas.filter((reserva) =>
+        reserva.status === StatusReserva.ATIVA && reserva.responsavelId === responsavel
+    );
 
     const trocarDestino = (novo: DestinoReservaId) => {
         setDestino(novo);
@@ -191,7 +185,7 @@ export function ReservasScreen() {
                 ) : (
                     <>
                         <Section title="1. Responsável">
-                            <View style={styles.chips}><Chip label="Rodrigo" selected={responsavel === UsuarioId.RODRIGO} onPress={() => trocarResponsavel(UsuarioId.RODRIGO)} /><Chip label="Cesar" selected={responsavel === UsuarioId.CESAR} onPress={() => trocarResponsavel(UsuarioId.CESAR)} /></View>
+                            <Text style={styles.product}>{usuario!.nome}</Text>
                         </Section>
                         <Section title="2. Destino">
                             <View style={styles.wrap}>{destinos.map((item) => <Chip key={item} label={nomeDestino(item)} selected={destino === item} onPress={() => trocarDestino(item)} />)}</View>

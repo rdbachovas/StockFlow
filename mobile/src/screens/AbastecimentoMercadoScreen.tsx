@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { LocalId } from "../models/Local";
 import { UsuarioId } from "../models/Usuario";
 import { AbastecimentoLocalScreen } from "./AbastecimentoLocalScreen";
@@ -13,7 +14,8 @@ interface Props {
 
 export function AbastecimentoMercadoScreen({ localId, localNome, onChangeLocal }: Props) {
     const { estoqueRodrigo, estoqueCesar, reservas, registrarAbastecimento } = useApp();
-    const [responsavel, setResponsavel] = useState<UsuarioId>(UsuarioId.RODRIGO);
+    const { usuario } = useAuth();
+    const responsavel = usuario!.id;
     const estoque = responsavel === UsuarioId.RODRIGO ? estoqueRodrigo : estoqueCesar;
 
     return (
@@ -26,7 +28,6 @@ export function AbastecimentoMercadoScreen({ localId, localNome, onChangeLocal }
             reservas={reservas}
             registrarAbastecimento={registrarAbastecimento}
             onChangeLocal={onChangeLocal}
-            onChangeResponsible={setResponsavel}
         />
     );
 }

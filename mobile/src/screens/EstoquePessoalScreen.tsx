@@ -15,6 +15,7 @@ import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
 import { EmptyState } from "../components/ui/EmptyState";
+import { useAuth } from "../context/AuthContext";
 import {
     Palette,
     Spacing,
@@ -59,10 +60,11 @@ export function EstoquePessoalScreen({
     estoqueRodrigo,
     estoqueCesar,
     reservas,
-    responsavelInicial = UsuarioId.RODRIGO
+    responsavelInicial: _responsavelInicial = UsuarioId.RODRIGO
 }: Props) {
     const router = useRouter();
-    const [responsible, setResponsible] = useState<UsuarioId>(responsavelInicial);
+    const { usuario } = useAuth();
+    const responsible = usuario!.id;
     const [expandedProduct, setExpandedProduct] = useState<ProdutoId | null>(null);
 
     const stock = responsible === UsuarioId.RODRIGO ? estoqueRodrigo : estoqueCesar;
@@ -79,11 +81,6 @@ export function EstoquePessoalScreen({
     const physicalTotal = allProducts.reduce((total, productId) => total + quantity(productId), 0);
     const reservedTotal = PRODUTOS_PELUCIAS.reduce((total, productId) => total + reserved(productId), 0);
     const freeTotal = allProducts.reduce((total, productId) => total + free(productId), 0);
-
-    const changeResponsible = (person: UsuarioId) => {
-        setResponsible(person);
-        setExpandedProduct(null);
-    };
 
     const renderGroup = (title: string, products: ProdutoId[], isCart: boolean) => {
         const availableProducts = products.filter((productId) => quantity(productId) > 0);
@@ -187,8 +184,7 @@ export function EstoquePessoalScreen({
             <Text style={styles.subtitle}>Saldos físicos, reservas e disponibilidade por responsável.</Text>
 
             <View style={styles.personSelector}>
-                <Chip label="Rodrigo" selected={responsible === UsuarioId.RODRIGO} onPress={() => changeResponsible(UsuarioId.RODRIGO)} />
-                <Chip label="Cesar" selected={responsible === UsuarioId.CESAR} onPress={() => changeResponsible(UsuarioId.CESAR)} />
+                <Text style={styles.productName}>{usuario!.nome}</Text>
             </View>
 
             <Card style={styles.summary}>

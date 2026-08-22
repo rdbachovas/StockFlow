@@ -3,12 +3,13 @@ import React from "react";
 import { useLocalSearchParams } from "expo-router";
 
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { ProdutoId } from "../models/Produto";
 import { UsuarioId } from "../models/Usuario";
 import { DevolucaoEstoqueScreen } from "../screens/DevolucaoEstoqueScreen";
 
 export default function ReturnPage() {
-    const { responsavelId, produtoId } = useLocalSearchParams<{
+    const { produtoId } = useLocalSearchParams<{
         responsavelId?: string;
         produtoId?: string;
     }>();
@@ -19,10 +20,11 @@ export default function ReturnPage() {
         reservas,
         registrarDevolucao
     } = useApp();
+    const { usuario } = useAuth();
 
     return (
         <DevolucaoEstoqueScreen
-            responsavelInicial={responsavelId === UsuarioId.CESAR ? UsuarioId.CESAR : UsuarioId.RODRIGO}
+            responsavelInicial={usuario!.id}
             produtoInicial={produtoId as ProdutoId | undefined}
             estoqueRodrigo={estoqueRodrigo}
             estoqueCesar={estoqueCesar}

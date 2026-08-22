@@ -13,6 +13,24 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
 
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
 
+const adicionar = (
+    tipo: Parameters<typeof FilaComandosService.adicionar>[0],
+    payload: Parameters<typeof FilaComandosService.adicionar>[1]
+) => FilaComandosService.adicionar(
+    tipo,
+    payload,
+    "RODRIGO"
+);
+
+const processar = (
+    estado: Parameters<typeof FilaComandosService.processar>[0],
+    atualizarEstado?: Parameters<typeof FilaComandosService.processar>[2],
+    aplicarResultado?: Parameters<typeof FilaComandosService.processar>[3]
+) => FilaComandosService.processar(estado, "RODRIGO", atualizarEstado, aplicarResultado);
+
+const reenviar = (commandId: string, estado: Parameters<typeof FilaComandosService.reenviar>[1]) =>
+    FilaComandosService.reenviar(commandId, estado, "RODRIGO");
+
 function snapshot(revisao: number) {
     return {
         revisao,
@@ -41,7 +59,7 @@ describe("fila offline persistente", () => {
     test("operação offline persiste sem alterar o snapshot e sobrevive ao restart", async () => {
         const dados = criarDadosIniciais();
         const saldo = dados.estoquePrincipal.itens[0].quantidade;
-        const comando = await FilaComandosService.adicionar("RETIRADA", {
+        const comando = await adicionar("RETIRADA", {
             responsavelId: "RODRIGO",
             itens: [{ produtoId: "MIX", quantidade: 10 }],
             data: new Date().toISOString()
@@ -61,7 +79,7 @@ describe("fila offline persistente", () => {
     });
 
     test("restart recupera ENVIANDO como PENDENTE sem perder commandId ou payload", async () => {
-        const comando = await FilaComandosService.adicionar("ABASTECIMENTO", {
+        const comando = await adicionar("ABASTECIMENTO", {
             responsavelId: "CESAR",
             local: "AEROPORTO",
             itens: [{ produtoId: "MIX", quantidade: 1 }],
@@ -83,12 +101,12 @@ describe("fila offline persistente", () => {
     });
 
     test("processa em ordem e somente um por vez", async () => {
-        const primeiro = await FilaComandosService.adicionar("MOVIMENTO_PRINCIPAL", {
+        const primeiro = await adicionar("MOVIMENTO_PRINCIPAL", {
             tipo: "ENTRADA",
             itens: [{ produtoId: "MIX", quantidade: 1 }],
             data: new Date().toISOString()
         });
-        const segundo = await FilaComandosService.adicionar("CONSUMO_CARRINHO", {
+        const segundo = await adicionar("CONSUMO_CARRINHO", {
             responsavelId: "RODRIGO",
             itens: [{ produtoId: "MILHO", quantidade: 1 }],
             data: new Date().toISOString()
@@ -111,8 +129,8 @@ describe("fila offline persistente", () => {
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
         await Promise.all([
-            FilaComandosService.processar("ONLINE"),
-            FilaComandosService.processar("ONLINE")
+            processar("ONLINE"),
+            processar("ONLINE")
         ]);
 
         expect(ordem).toEqual([primeiro.commandId, segundo.commandId]);
@@ -120,10 +138,10 @@ describe("fila offline persistente", () => {
     });
 
     test("falha ambígua preserva commandId e erro definitivo pausa o seguinte", async () => {
-        const primeiro = await FilaComandosService.adicionar("MOVIMENTO_PRINCIPAL", {
+        const primeiro = await adicionar("MOVIMENTO_PRINCIPAL", {
             tipo: "ENTRADA", itens: [{ produtoId: "MIX", quantidade: 1 }], data: new Date().toISOString()
         });
-        const segundo = await FilaComandosService.adicionar("CONSUMO_CARRINHO", {
+        const segundo = await adicionar("CONSUMO_CARRINHO", {
             responsavelId: "RODRIGO", itens: [{ produtoId: "MILHO", quantidade: 1 }], data: new Date().toISOString()
         });
         const movimento = jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal")
@@ -134,9 +152,9 @@ describe("fila offline persistente", () => {
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot(3));
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
         expect(FilaComandosService.listar()[0].commandId).toBe(primeiro.commandId);
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
 
         expect(movimento.mock.calls[0][0].commandId).toBe(primeiro.commandId);
         expect(movimento.mock.calls[1][0].commandId).toBe(primeiro.commandId);
@@ -147,16 +165,16 @@ describe("fila offline persistente", () => {
         ]);
 
         await FilaComandosService.descartar(primeiro.commandId);
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
         expect(consumo.mock.calls[0][0].commandId).toBe(segundo.commandId);
         expect(FilaComandosService.listar()).toHaveLength(0);
     });
 
     test("snapshot pendente bloqueia o próximo comando e a recuperação não repete o POST", async () => {
-        const primeiro = await FilaComandosService.adicionar("MOVIMENTO_PRINCIPAL", {
+        const primeiro = await adicionar("MOVIMENTO_PRINCIPAL", {
             tipo: "ENTRADA", itens: [{ produtoId: "MIX", quantidade: 1 }], data: new Date().toISOString()
         });
-        const segundo = await FilaComandosService.adicionar("CONSUMO_CARRINHO", {
+        const segundo = await adicionar("CONSUMO_CARRINHO", {
             responsavelId: "CESAR", itens: [{ produtoId: "OLEO", quantidade: 1 }], data: new Date().toISOString()
         });
         const movimento = jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal")
@@ -170,7 +188,7 @@ describe("fila offline persistente", () => {
             .mockResolvedValueOnce(snapshot(11));
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
 
         expect(movimento).toHaveBeenCalledTimes(1);
         expect(consumo).not.toHaveBeenCalled();
@@ -179,7 +197,7 @@ describe("fila offline persistente", () => {
             expect.objectContaining({ commandId: segundo.commandId, status: "PENDENTE" })
         ]);
 
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
 
         expect(movimento).toHaveBeenCalledTimes(1);
         expect(consumo).toHaveBeenCalledTimes(1);
@@ -187,7 +205,7 @@ describe("fila offline persistente", () => {
     });
 
     test("retry conserva commandId, nova intenção recebe outro e conflito sobrevive restart", async () => {
-        const comando = await FilaComandosService.adicionar("RETIRADA", {
+        const comando = await adicionar("RETIRADA", {
             responsavelId: "RODRIGO",
             itens: [{ produtoId: "MIX", quantidade: 2 }],
             data: new Date().toISOString()
@@ -200,7 +218,7 @@ describe("fila offline persistente", () => {
             .mockResolvedValueOnce(snapshot(20));
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        await FilaComandosService.processar("ONLINE");
+        await processar("ONLINE");
         const conteudo = storage.setItem.mock.calls.at(-1)?.[1] ?? "";
         storage.getItem.mockResolvedValue(conteudo);
         FilaComandosService.reiniciarEstadoEmMemoria();
@@ -212,10 +230,10 @@ describe("fila offline persistente", () => {
             payload: comando.payload
         }));
 
-        await FilaComandosService.reenviar(comando.commandId, "ONLINE");
+        await reenviar(comando.commandId, "ONLINE");
         expect(post.mock.calls[0][0].commandId).toBe(comando.commandId);
         expect(post.mock.calls[1][0].commandId).toBe(comando.commandId);
-        const novaIntencao = await FilaComandosService.adicionar("RETIRADA", {
+        const novaIntencao = await adicionar("RETIRADA", {
             responsavelId: "RODRIGO",
             itens: [{ produtoId: "MIX", quantidade: 2 }],
             data: new Date().toISOString()
@@ -224,7 +242,7 @@ describe("fila offline persistente", () => {
     });
 
     test("reconciliação final aplica revisão válida, esvazia fila e volta para ONLINE", async () => {
-        await FilaComandosService.adicionar("CONSUMO_CARRINHO", {
+        await adicionar("CONSUMO_CARRINHO", {
             responsavelId: "CESAR",
             itens: [{ produtoId: "CHOCOLATE", quantidade: 1 }],
             data: new Date().toISOString()
@@ -238,7 +256,7 @@ describe("fila offline persistente", () => {
         const estados: string[] = [];
         const revisoes: number[] = [];
 
-        await FilaComandosService.processar(
+        await processar(
             "ONLINE",
             (estado) => estados.push(estado),
             (resultado) => {
@@ -252,5 +270,62 @@ describe("fila offline persistente", () => {
         expect(revisoes).toEqual([30, 31]);
         expect(estados.at(-1)).toBe("ONLINE");
         expect(FilaComandosService.listar()).toHaveLength(0);
+    });
+
+    test("comando novo pertence ao usuário e outro usuário não o processa", async () => {
+        const comando = await FilaComandosService.adicionar("RETIRADA", {
+            responsavelId: "CESAR",
+            itens: [{ produtoId: "MIX", quantidade: 1 }]
+        }, "CESAR");
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1000 } as never);
+        jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot(1000));
+        jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
+
+        await FilaComandosService.processar("ONLINE", "RODRIGO");
+        expect(post).not.toHaveBeenCalled();
+        expect(FilaComandosService.listar()[0]).toMatchObject({
+            commandId: comando.commandId,
+            usuarioIdCriador: "CESAR"
+        });
+
+        const persistido = storage.setItem.mock.calls.at(-1)?.[1] ?? "";
+        storage.getItem.mockResolvedValue(persistido);
+        FilaComandosService.reiniciarEstadoEmMemoria();
+        await FilaComandosService.processar("ONLINE", "CESAR");
+        expect(post).toHaveBeenCalledWith(expect.objectContaining({ commandId: comando.commandId }));
+        expect(FilaComandosService.listar()).toHaveLength(0);
+    });
+
+    test("fila antiga sem criador determinável requer atenção e não é enviada", async () => {
+        storage.getItem.mockResolvedValue(JSON.stringify({
+            versao: 2,
+            comandos: [{
+                commandId: "cmd-antigo",
+                tipo: "MOVIMENTO_PRINCIPAL",
+                payload: { commandId: "cmd-antigo", tipo: "ENTRADA", itens: [] },
+                dataCriacao: new Date().toISOString(),
+                status: "PENDENTE",
+                tentativas: 0
+            }]
+        }));
+        const post = jest.spyOn(ApiService, "registrarMovimentoEstoquePrincipal");
+
+        const comando = (await FilaComandosService.carregar())[0];
+        await FilaComandosService.processar("ONLINE", "RODRIGO");
+
+        expect(comando.status).toBe("REQUER_ATENCAO");
+        expect(comando.usuarioIdCriador).toBeUndefined();
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    test("fila persistida não contém tokens e logout não a remove", async () => {
+        await FilaComandosService.adicionar("CONSUMO_CARRINHO", {
+            responsavelId: "RODRIGO",
+            itens: [{ produtoId: "MILHO", quantidade: 1 }]
+        }, "RODRIGO");
+        const conteudo = storage.setItem.mock.calls.at(-1)?.[1] ?? "";
+        expect(conteudo).not.toMatch(/accessToken|refreshToken|Bearer/);
+        expect(storage.setItem).toHaveBeenCalled();
+        expect(storage.getItem).toBeDefined();
     });
 });

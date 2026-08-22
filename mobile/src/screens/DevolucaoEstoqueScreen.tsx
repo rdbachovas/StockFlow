@@ -18,6 +18,7 @@ import { Card } from "../components/ui/Card";
 import { Chip } from "../components/ui/Chip";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FeedbackBanner } from "../components/ui/FeedbackBanner";
+import { useAuth } from "../context/AuthContext";
 import {
     ControlSize,
     Palette,
@@ -60,7 +61,7 @@ function nomeDestino(destinoId: DestinoReservaId): string {
 }
 
 export function DevolucaoEstoqueScreen({
-    responsavelInicial,
+    responsavelInicial: _responsavelInicial,
     produtoInicial,
     estoqueRodrigo,
     estoqueCesar,
@@ -68,7 +69,8 @@ export function DevolucaoEstoqueScreen({
     reservas,
     registrarDevolucao
 }: Props) {
-    const [responsavel, setResponsavel] = useState<UsuarioId>(responsavelInicial);
+    const { usuario } = useAuth();
+    const responsavel = usuario!.id;
     const [produto, setProduto] = useState<ProdutoId | undefined>(produtoInicial);
     const [quantidadeLivre, setQuantidadeLivre] = useState("");
     const [quantidadesReservas, setQuantidadesReservas] = useState<Record<string, string>>({});
@@ -158,10 +160,7 @@ export function DevolucaoEstoqueScreen({
         <View style={styles.container}>
             <Screen contentContainerStyle={styles.content}>
                 <Section title="Responsável">
-                    <View style={styles.chips}>
-                        <Chip label="Rodrigo" selected={responsavel === UsuarioId.RODRIGO} onPress={() => { setResponsavel(UsuarioId.RODRIGO); setProduto(undefined); limparSelecao(); }} />
-                        <Chip label="Cesar" selected={responsavel === UsuarioId.CESAR} onPress={() => { setResponsavel(UsuarioId.CESAR); setProduto(undefined); limparSelecao(); }} />
-                    </View>
+                    <Text style={styles.productName}>{usuario!.nome}</Text>
                 </Section>
 
                 <Section title="Produto" description="Selecione um item em posse do responsável.">

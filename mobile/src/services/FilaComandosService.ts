@@ -48,13 +48,15 @@ export class FilaComandosService {
 
     static async adicionar(
         tipo: TipoComandoPendente,
-        payloadSemCommandId: Record<string, unknown>
+        payloadSemCommandId: Record<string, unknown>,
+        usuarioIdCriador: string
     ): Promise<ComandoPendente> {
         await this.carregar();
         const commandId = gerarCommandId();
         const payload = { ...payloadSemCommandId, commandId };
         const comando = {
             commandId,
+            usuarioIdCriador,
             tipo,
             payload,
             dataCriacao: new Date().toISOString(),
@@ -68,6 +70,7 @@ export class FilaComandosService {
 
     static processar(
         estado: EstadoSincronizacao,
+        usuarioId: string,
         atualizarEstado?: (estado: EstadoSincronizacao) => void,
         aplicarResultado?: (resultado: ResultadoOperacao) => void
     ): Promise<void> {
@@ -77,6 +80,7 @@ export class FilaComandosService {
 
         this.processando = this.processarInternamente(
             estado,
+            usuarioId,
             atualizarEstado,
             aplicarResultado
         ).finally(() => {
@@ -88,6 +92,7 @@ export class FilaComandosService {
     static async reenviar(
         commandId: string,
         estado: EstadoSincronizacao,
+        usuarioId: string,
         atualizarEstado?: (estado: EstadoSincronizacao) => void,
         aplicarResultado?: (resultado: ResultadoOperacao) => void
     ): Promise<void> {
@@ -95,6 +100,7 @@ export class FilaComandosService {
         const comando = this.comandos.find((item) => item.commandId === commandId);
         if (
             comando === undefined ||
+            comando.usuarioIdCriador !== usuarioId ||
             !["ERRO", "CONFLITO"].includes(comando.status)
         ) {
             throw new Error("Este comando não está disponível para reenvio.");
@@ -104,7 +110,7 @@ export class FilaComandosService {
             erro: undefined,
             motivo: undefined
         });
-        await this.processar(estado, atualizarEstado, aplicarResultado);
+        await this.processar(estado, usuarioId, atualizarEstado, aplicarResultado);
     }
 
     static async descartar(commandId: string): Promise<void> {
@@ -122,6 +128,7 @@ export class FilaComandosService {
 
     private static async processarInternamente(
         estado: EstadoSincronizacao,
+        usuarioId: string,
         atualizarEstado?: (estado: EstadoSincronizacao) => void,
         aplicarResultado?: (resultado: ResultadoOperacao) => void
     ): Promise<void> {
@@ -131,8 +138,11 @@ export class FilaComandosService {
         }
 
         for (const comando of [...this.comandos]) {
-            if (["ERRO", "CONFLITO"].includes(comando.status)) {
-                return;
+            if (comando.usuarioIdCriador !== usuarioId) {
+                continue;
+            }
+            if (["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(comando.status)) {
+                continue;
             }
 
             let resultado: ResultadoOperacao;

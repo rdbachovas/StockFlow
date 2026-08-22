@@ -197,7 +197,8 @@ describe("ApiService", () => {
         await ApiService.obterSnapshot();
 
         expect(buscar).toHaveBeenCalledWith(
-            "https://api.stockflow.test/api/v1/snapshot"
+            "https://api.stockflow.test/api/v1/snapshot",
+            expect.objectContaining({ headers: expect.any(Headers) })
         );
     });
 

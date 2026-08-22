@@ -5,7 +5,7 @@ import React, {
     useEffect,
     useState
 } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
     DadosIniciais
@@ -41,10 +41,12 @@ import { ReservaRemotaService } from "../services/ReservaRemotaService";
 import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
 import { ComandoPendente } from "../models/ComandoPendente";
 import { FilaComandosService } from "../services/FilaComandosService";
+import { IdentidadeOperacionalService } from "../services/IdentidadeOperacionalService";
 import {
     OperacaoRemotaCoordinator,
     ResultadoOperacao
 } from "../services/OperacaoRemotaCoordinator";
+import { useAuth } from "./AuthContext";
 
 interface AppContextValue {
 
@@ -133,6 +135,11 @@ interface Props {
 export function AppProvider({
     children
 }: Props) {
+    const { usuario, logout } = useAuth();
+
+    if (!usuario) {
+        throw new Error("AppProvider exige uma sessão autenticada.");
+    }
 
     const [
         dados,
@@ -178,6 +185,7 @@ export function AppProvider({
                 if (resultado.estadoSincronizacao === "ONLINE") {
                     void FilaComandosService.processar(
                         "ONLINE",
+                        usuario.id,
                         setEstadoSincronizacao,
                         aplicarResultado
                     );
@@ -211,19 +219,20 @@ export function AppProvider({
                 setEstadoSincronizacao("ONLINE");
                 void FilaComandosService.processar(
                     "ONLINE",
+                    usuario.id,
                     setEstadoSincronizacao,
                     aplicarResultado
                 );
             });
         }, 10000);
         return () => clearInterval(intervalo);
-    }, [estadoSincronizacao]);
+    }, [estadoSincronizacao, usuario.id]);
 
     const salvarOffline = async (
         tipo: Parameters<typeof FilaComandosService.adicionar>[0],
         payload: Record<string, unknown>
     ): Promise<void> => {
-        await FilaComandosService.adicionar(tipo, payload);
+        await FilaComandosService.adicionar(tipo, payload, usuario.id);
         throw new Error(
             "Operação salva offline e mantida como pendente. O saldo ainda não foi atualizado."
         );
@@ -268,6 +277,7 @@ export function AppProvider({
     const registrarRetirada = (
         retirada: RetiradaEstoque
     ): Promise<void> => {
+        exigirIdentidade(retirada.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("RETIRADA", {
                 responsavelId: retirada.responsavelId,
@@ -288,6 +298,7 @@ export function AppProvider({
     const registrarAbastecimento = (
         abastecimento: Abastecimento
     ): Promise<void> => {
+        exigirIdentidade(abastecimento.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("ABASTECIMENTO", {
                 responsavelId: abastecimento.responsavelId,
@@ -305,6 +316,7 @@ export function AppProvider({
     const criarReserva = (
         reserva: Reserva
     ): Promise<void> => {
+        exigirIdentidade(reserva.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CRIAR_RESERVA", {
                 responsavelId: reserva.responsavelId,
@@ -322,6 +334,7 @@ export function AppProvider({
         reservaId: string,
         responsavelId: string
     ): Promise<void> => {
+        exigirIdentidade(responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CANCELAR_RESERVA", {
                 reservaId,
@@ -341,6 +354,7 @@ export function AppProvider({
     const registrarDevolucao = (
         devolucao: DevolucaoEstoque
     ): Promise<void> => {
+        exigirIdentidade(devolucao.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("DEVOLUCAO", {
                 responsavelId: devolucao.responsavelId,
@@ -365,6 +379,7 @@ export function AppProvider({
         solicitacao:
             SolicitacaoMovimentoEstoquePrincipal
     ): Promise<void> => {
+        exigirIdentidade(solicitacao.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("MOVIMENTO_PRINCIPAL", {
                 tipo: solicitacao.tipo,
@@ -382,6 +397,7 @@ export function AppProvider({
         solicitacao:
             SolicitacaoConsumoCarrinho
     ): Promise<void> => {
+        exigirIdentidade(solicitacao.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CONSUMO_CARRINHO", {
                 responsavelId: solicitacao.responsavelId,
@@ -405,6 +421,7 @@ export function AppProvider({
         FilaComandosService.reenviar(
             commandId,
             estadoSincronizacao,
+            usuario.id,
             setEstadoSincronizacao,
             aplicarResultado
         );
@@ -414,10 +431,15 @@ export function AppProvider({
         if (estadoSincronizacao === "ONLINE") {
             await FilaComandosService.processar(
                 "ONLINE",
+                usuario.id,
                 setEstadoSincronizacao,
                 aplicarResultado
             );
         }
+    };
+
+    const exigirIdentidade = (responsavelId: string): void => {
+        IdentidadeOperacionalService.exigirUsuarioAutenticado(usuario.id, responsavelId);
     };
 
     if (
@@ -434,13 +456,15 @@ export function AppProvider({
                 estadoSincronizacao,
 
                 quantidadeComandosPendentes: comandosFila.filter(
-                    (comando) => !["ERRO", "CONFLITO"].includes(comando.status)
+                    (comando) => comando.usuarioIdCriador === usuario.id &&
+                        !["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(comando.status)
                 ).length,
 
                 comandosFila,
 
                 comandosComErro: comandosFila.filter(
-                    (comando) => ["ERRO", "CONFLITO"].includes(comando.status)
+                    (comando) => comando.usuarioIdCriador === usuario.id &&
+                        ["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(comando.status)
                 ),
 
                 reenviarComando,
@@ -491,12 +515,18 @@ export function AppProvider({
                 sincronizarSnapshotPendente
             }}
         >
-            {comandosFila.length > 0 && (
+            <View style={styles.conta}>
+                <Text style={styles.textoConta}>Conta: {usuario.nome}</Text>
+                <Pressable onPress={() => { void logout(); }}>
+                    <Text style={styles.sair}>Sair</Text>
+                </Pressable>
+            </View>
+            {comandosFila.some((item) => item.usuarioIdCriador === usuario.id) && (
                 <View style={styles.fila}>
                     <Text style={styles.textoFila}>
-                        {comandosFila.filter((item) => !["ERRO", "CONFLITO"].includes(item.status)).length} operação(ões) pendente(s). O saldo exibido ainda é o último confirmado.
-                        {comandosFila.some((item) => ["ERRO", "CONFLITO"].includes(item.status))
-                            ? ` ${comandosFila.filter((item) => ["ERRO", "CONFLITO"].includes(item.status)).length} requer(em) atenção.`
+                        {comandosFila.filter((item) => item.usuarioIdCriador === usuario.id && !["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(item.status)).length} operação(ões) pendente(s). O saldo exibido ainda é o último confirmado.
+                        {comandosFila.some((item) => item.usuarioIdCriador === usuario.id && ["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(item.status))
+                            ? ` ${comandosFila.filter((item) => item.usuarioIdCriador === usuario.id && ["ERRO", "CONFLITO", "REQUER_ATENCAO"].includes(item.status)).length} requer(em) atenção.`
                             : ""}
                     </Text>
                 </View>
@@ -507,6 +537,16 @@ export function AppProvider({
 }
 
 const styles = StyleSheet.create({
+    conta: {
+        alignItems: "center",
+        backgroundColor: "#EAF2FF",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingVertical: 6
+    },
+    textoConta: { color: "#173A63", fontSize: 12, fontWeight: "600" },
+    sair: { color: "#173A63", fontSize: 12, fontWeight: "700" },
     fila: {
         backgroundColor: "#FFF3CD",
         paddingHorizontal: 12,
