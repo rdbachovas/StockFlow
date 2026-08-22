@@ -1,4 +1,5 @@
 export interface RegistrarAbastecimentoRequestDto {
+    commandId: string;
     responsavelId: string;
     local: string;
     itens: Array<{
@@ -11,6 +12,7 @@ export interface RegistrarAbastecimentoRequestDto {
 }
 
 export interface RegistrarAbastecimentoResponseDto {
+    revisao: number;
     id: string;
     responsavelId: string;
     estoqueOrigemId: string;

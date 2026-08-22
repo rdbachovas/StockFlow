@@ -5,8 +5,15 @@ import {
 } from "./ApiService";
 import { PersistenceService } from "./PersistenceService";
 import { SnapshotMapper } from "./SnapshotMapper";
+import { FilaComandosService } from "./FilaComandosService";
 
-export type EstadoSincronizacao = "CARREGANDO" | "ONLINE" | "OFFLINE" | "ERRO";
+export type EstadoSincronizacao =
+    | "CARREGANDO"
+    | "ONLINE"
+    | "SINCRONIZANDO"
+    | "DESATUALIZADO"
+    | "OFFLINE"
+    | "ERRO";
 
 export interface ResultadoInicializacao {
     dados: DadosIniciais;
@@ -17,6 +24,7 @@ export class InicializacaoService {
     static async carregar(): Promise<ResultadoInicializacao> {
         const cache = await PersistenceService.carregar();
         const dadosCache = cache.tipo === "VALIDO" ? cache.dados : undefined;
+        await FilaComandosService.carregar();
         let resposta: unknown;
 
         try {
@@ -40,6 +48,16 @@ export class InicializacaoService {
             return {
                 dados: dadosCache ?? criarDadosIniciais(),
                 estadoSincronizacao: "ERRO"
+            };
+        }
+
+        if (
+            dadosCache !== undefined &&
+            dados.revisaoServidor < dadosCache.revisaoServidor
+        ) {
+            return {
+                dados: dadosCache,
+                estadoSincronizacao: "DESATUALIZADO"
             };
         }
 

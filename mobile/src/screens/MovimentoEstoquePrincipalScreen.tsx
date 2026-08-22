@@ -38,7 +38,7 @@ import {
 
 interface Props {
     estoquePrincipal: Estoque;
-    registrarMovimento: (solicitacao: SolicitacaoMovimentoEstoquePrincipal) => void;
+    registrarMovimento: (solicitacao: SolicitacaoMovimentoEstoquePrincipal) => Promise<void>;
 }
 
 type Grupo = "PELUCIAS" | "CARRINHO";
@@ -51,6 +51,7 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
     const [observacao, setObservacao] = useState("");
     const [sucesso, setSucesso] = useState<string | null>(null);
     const [erro, setErro] = useState<string | null>(null);
+    const [enviando, setEnviando] = useState(false);
     const todosProdutos = [...PRODUTOS_PELUCIAS, ...PRODUTOS_CARRINHO];
     const produtosVisiveis = grupo === "PELUCIAS" ? PRODUTOS_PELUCIAS : PRODUTOS_CARRINHO;
 
@@ -69,7 +70,11 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
         return tipo === TipoMovimentoEstoquePrincipal.ENTRADA ? atual + valor : atual - valor;
     };
 
-    const confirmar = () => {
+    const confirmar = async () => {
+        if (enviando) {
+            return;
+        }
+
         setErro(null);
         setSucesso(null);
         if (itens.length === 0) {
@@ -84,8 +89,9 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
             data: new Date(),
             observacao: observacao.trim() || undefined
         };
+        setEnviando(true);
         try {
-            registrarMovimento(solicitacao);
+            await registrarMovimento(solicitacao);
             setQuantidades({});
             setObservacao("");
             setSucesso(tipo === TipoMovimentoEstoquePrincipal.ENTRADA
@@ -93,6 +99,8 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
                 : `${total} itens removidos do Estoque Principal.`);
         } catch (caughtError) {
             setErro(caughtError instanceof Error ? caughtError.message : "Erro ao atualizar o estoque.");
+        } finally {
+            setEnviando(false);
         }
     };
 
@@ -149,7 +157,7 @@ export function MovimentoEstoquePrincipalScreen({ estoquePrincipal, registrarMov
                 {erro ? <FeedbackBanner title="Não foi possível atualizar" message={erro} variant="danger" /> : null}
                 {sucesso ? <FeedbackBanner title="Estoque atualizado" message={sucesso} /> : null}
             </Screen>
-            <BottomActionBar summaryLabel="Total" summaryValue={`${total} itens`} actionLabel={tipo === TipoMovimentoEstoquePrincipal.ENTRADA ? "Confirmar entrada" : "Confirmar saída"} onPress={confirmar} destructive={tipo === TipoMovimentoEstoquePrincipal.SAIDA} />
+            <BottomActionBar summaryLabel="Total" summaryValue={`${total} itens`} actionLabel={tipo === TipoMovimentoEstoquePrincipal.ENTRADA ? "Confirmar entrada" : "Confirmar saída"} onPress={() => { void confirmar(); }} loading={enviando} destructive={tipo === TipoMovimentoEstoquePrincipal.SAIDA} />
         </View>
     );
 }

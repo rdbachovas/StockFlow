@@ -7,6 +7,7 @@ import { ProdutoId } from "../src/models/Produto";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { DevolucaoEstoqueService } from "../src/services/DevolucaoEstoqueService";
 import { DevolucaoRemotaService } from "../src/services/DevolucaoRemotaService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { PersistenceService } from "../src/services/PersistenceService";
 
 jest.mock("@react-native-async-storage/async-storage", () => ({
@@ -33,6 +34,7 @@ function devolucao(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             {
                 id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null,
@@ -80,13 +82,14 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(oficial = snapshot()): void {
-    jest.spyOn(ApiService, "registrarDevolucao").mockResolvedValue({ id: "devolucao-oficial" });
+    jest.spyOn(ApiService, "registrarDevolucao").mockResolvedValue({ id: "devolucao-oficial", revisao: 1 });
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
 
 describe("devolução remota", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("devolução");
         jest.restoreAllMocks();
     });
 
@@ -101,6 +104,7 @@ describe("devolução remota", () => {
         preparar();
         await DevolucaoRemotaService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarDevolucao).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: entrada.responsavelId,
             itens: entrada.itens.map((item) => ({
                 produtoId: item.produtoId,
@@ -134,7 +138,10 @@ describe("devolução remota", () => {
 
     test("substitui saldos, reservas e histórico pelo snapshot oficial e atualiza cache", async () => {
         preparar();
-        const dados = await DevolucaoRemotaService.registrar(devolucao(), "ONLINE");
+        const resultado = await DevolucaoRemotaService.registrar(devolucao(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(ApiService.obterSnapshot).toHaveBeenCalledTimes(1);
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(335);
         expect(dados.estoqueRodrigo.itens[0].quantidade).toBe(65);
@@ -182,7 +189,7 @@ describe("devolução remota", () => {
         const pendente = new Promise<void>((resolve) => { concluir = resolve; });
         const post = jest.spyOn(ApiService, "registrarDevolucao").mockImplementation(async () => {
             await pendente;
-            return { id: "oficial" };
+            return { id: "oficial", revisao: 1 };
         });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();

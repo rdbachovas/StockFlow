@@ -8,6 +8,8 @@ import br.com.stockflow.estoque.Estoque;
 import br.com.stockflow.estoque.EstoqueItem;
 import br.com.stockflow.estoque.EstoqueItemRepository;
 import br.com.stockflow.estoque.EstoqueRepository;
+import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,19 +22,32 @@ public class RetiradaService {
     private final EstoqueRepository estoqueRepository;
     private final EstoqueItemRepository estoqueItemRepository;
     private final RetiradaRepository retiradaRepository;
+    private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public RetiradaService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
-            RetiradaRepository retiradaRepository
+            RetiradaRepository retiradaRepository,
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.retiradaRepository = retiradaRepository;
+        this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public RetiradaResponse registrar(RetiradaRequest request) {
+        return idempotenciaService.executar(
+                request.commandId(), "RETIRADA", RetiradaResponse.class,
+                () -> registrarNova(request), RetiradaResponse::revisao
+        );
+    }
+
+    private RetiradaResponse registrarNova(RetiradaRequest request) {
         Estoque principal = estoqueRepository.findById(ESTOQUE_PRINCIPAL)
                 .orElseThrow(() -> new RegraRetiradaException(
                         "Estoque Principal não encontrado."
@@ -134,7 +149,7 @@ public class RetiradaService {
         }
 
         Retirada salva = retiradaRepository.save(retirada);
-        return RetiradaResponse.de(salva);
+        return RetiradaResponse.de(salva, revisaoService.avancar());
     }
 
     private Map<String, RetiradaRequest.Item> validarEIndexarItens(

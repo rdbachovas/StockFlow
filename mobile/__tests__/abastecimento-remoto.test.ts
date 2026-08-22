@@ -6,6 +6,7 @@ import { LocalId } from "../src/models/Local";
 import { MaquinaId } from "../src/models/Maquina";
 import { ProdutoId } from "../src/models/Produto";
 import { AbastecimentoRemotoService } from "../src/services/AbastecimentoRemotoService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { AbastecimentoService } from "../src/services/AbastecimentoService";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { PersistenceService } from "../src/services/PersistenceService";
@@ -32,6 +33,7 @@ function abastecimento(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [] },
             {
@@ -65,13 +67,14 @@ function snapshot(): SnapshotDto {
 }
 
 function preparar(): void {
-    jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({} as never);
+    jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({ revisao: 1 } as never);
     jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
     jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 }
 
 describe("abastecimento remoto", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("abastecimento");
         jest.restoreAllMocks();
     });
 
@@ -79,6 +82,7 @@ describe("abastecimento remoto", () => {
         preparar();
         await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith({
+            commandId: expect.any(String),
             responsavelId: "RODRIGO", local: "BOULEVARD",
             itens: [{ maquinaId: "M1", produtoId: "MIX", quantidade: 4 }],
             data: "2026-08-17T12:00:00.000Z", observacao: "Reposição"
@@ -126,7 +130,7 @@ describe("abastecimento remoto", () => {
         oficial.abastecimentos[0].local = "SUPERMERCADO_FANTE";
         oficial.abastecimentos[0].itens[0].maquinaId = "SUPERMERCADO_FANTE";
         oficial.reservas[0].destino = "MERCADOS";
-        jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "registrarAbastecimento").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(oficial);
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
@@ -139,7 +143,10 @@ describe("abastecimento remoto", () => {
                 quantidade: 4
             }]
         );
-        const dados = await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
+        const resultado = await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith(
             expect.objectContaining({ local: "SUPERMERCADO_FANTE" })
@@ -166,7 +173,10 @@ describe("abastecimento remoto", () => {
 
     test("aplica snapshot oficial, reserva consumida, estoque e cache", async () => {
         preparar();
-        const dados = await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
+        const resultado = await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
         expect(dados.abastecimentos[0].id).toBe("abastecimento-oficial");
         expect(dados.reservas[0].quantidadeUtilizada).toBe(4);
         expect(dados.reservas[0].historico?.[0].id).toBe("uso-oficial");
@@ -219,7 +229,7 @@ describe("abastecimento remoto", () => {
         let concluir!: () => void;
         const espera = new Promise<void>((resolve) => { concluir = resolve; });
         const post = jest.spyOn(ApiService, "registrarAbastecimento")
-            .mockImplementation(async () => { await espera; return {} as never; });
+            .mockImplementation(async () => { await espera; return { revisao: 1 } as never; });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
         const primeira = AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");

@@ -1,29 +1,18 @@
-import { DadosIniciais } from "../data/AppData";
 import { DevolucaoEstoque } from "../models/DevolucaoEstoque";
 import { ApiService } from "./ApiService";
 import { EstadoSincronizacao } from "./InicializacaoService";
-import { PersistenceService } from "./PersistenceService";
-import { SnapshotMapper } from "./SnapshotMapper";
+import { OperacaoRemotaCoordinator, ResultadoOperacaoConfirmada } from "./OperacaoRemotaCoordinator";
 
 export class DevolucaoRemotaService {
-    private static emAndamento = false;
-
     static async registrar(
         devolucao: DevolucaoEstoque,
-        estadoSincronizacao: EstadoSincronizacao
-    ): Promise<DadosIniciais> {
-        if (estadoSincronizacao !== "ONLINE") {
-            throw new Error("Devolução indisponível enquanto o aplicativo está offline.");
-        }
-
-        if (this.emAndamento) {
-            throw new Error("Já existe uma devolução sendo enviada.");
-        }
-
-        this.emAndamento = true;
-
-        try {
-            await ApiService.registrarDevolucao({
+        estadoSincronizacao: EstadoSincronizacao,
+        atualizarEstado?: (estado: EstadoSincronizacao) => void
+    ): Promise<ResultadoOperacaoConfirmada> {
+        return await OperacaoRemotaCoordinator.executarParaServico(
+            "devolução",
+            (commandId) => ApiService.registrarDevolucao({
+                commandId,
                 responsavelId: devolucao.responsavelId,
                 itens: devolucao.itens.map((item) => ({
                     produtoId: item.produtoId,
@@ -35,14 +24,9 @@ export class DevolucaoRemotaService {
                 })),
                 data: devolucao.data.toISOString(),
                 observacao: devolucao.observacao
-            });
-
-            const snapshot = await ApiService.obterSnapshot();
-            const dados = SnapshotMapper.paraDadosIniciais(snapshot);
-            await PersistenceService.salvar(dados);
-            return dados;
-        } finally {
-            this.emAndamento = false;
-        }
+            }),
+            estadoSincronizacao,
+            atualizarEstado
+        );
     }
 }

@@ -98,6 +98,7 @@ export interface SnapshotConsumoCarrinhoDto extends SnapshotOperacaoDto {
 }
 
 export interface SnapshotDto {
+    revisao: number;
     estoques: SnapshotEstoqueDto[];
     reservas: SnapshotReservaDto[];
     retiradas: SnapshotRetiradaDto[];

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record RetiradaResponse(
+        long revisao,
         UUID id,
         String responsavelId,
         String estoqueOrigemId,
@@ -14,8 +15,9 @@ public record RetiradaResponse(
         String observacao
 ) {
 
-    public static RetiradaResponse de(Retirada retirada) {
+    public static RetiradaResponse de(Retirada retirada, long revisao) {
         return new RetiradaResponse(
+                revisao,
                 retirada.getId(),
                 retirada.getResponsavel().getId(),
                 retirada.getEstoqueOrigem().getId(),

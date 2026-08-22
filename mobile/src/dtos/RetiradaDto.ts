@@ -1,4 +1,5 @@
 export interface RegistrarRetiradaRequestDto {
+    commandId: string;
     responsavelId: string;
     itens: Array<{
         produtoId: string;
@@ -9,6 +10,7 @@ export interface RegistrarRetiradaRequestDto {
 }
 
 export interface RegistrarRetiradaResponseDto {
+    revisao: number;
     id: string;
     responsavelId: string;
     estoqueOrigemId: string;

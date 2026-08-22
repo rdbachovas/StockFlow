@@ -81,7 +81,8 @@ class AbastecimentoIntegrationTest {
     @Test
     void abasteceSomenteComEstoqueLivre() throws Exception {
         abastecer("RODRIGO", "BOULEVARD", item("M1", "MIX", 20))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").isNumber());
         assertThat(saldo("ESTOQUE_RODRIGO", "MIX")).isEqualTo(80);
     }
 

@@ -5,6 +5,7 @@ import React, {
     useEffect,
     useState
 } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 import {
     DadosIniciais
@@ -27,23 +28,37 @@ import {
 
 import { Reserva } from "../models/Reserva";
 import { RetiradaEstoque } from "../models/RetiradaEstoque";
-import { UsuarioId } from "../models/Usuario";
 
 import { AbastecimentoRemotoService } from "../services/AbastecimentoRemotoService";
-import { ConsumoCarrinhoService } from "../services/ConsumoCarrinhoService";
+import { ConsumoCarrinhoRemotoService } from "../services/ConsumoCarrinhoRemotoService";
 import { DevolucaoRemotaService } from "../services/DevolucaoRemotaService";
-import { MovimentoEstoquePrincipalService } from "../services/MovimentoEstoquePrincipalService";
-import { PersistenceService } from "../services/PersistenceService";
+import { MovimentoEstoquePrincipalRemotoService } from "../services/MovimentoEstoquePrincipalRemotoService";
 import {
     EstadoSincronizacao,
     InicializacaoService
 } from "../services/InicializacaoService";
 import { ReservaRemotaService } from "../services/ReservaRemotaService";
 import { RetiradaRemotaService } from "../services/RetiradaRemotaService";
+import { ComandoPendente } from "../models/ComandoPendente";
+import { FilaComandosService } from "../services/FilaComandosService";
+import {
+    OperacaoRemotaCoordinator,
+    ResultadoOperacao
+} from "../services/OperacaoRemotaCoordinator";
 
 interface AppContextValue {
 
     estadoSincronizacao: EstadoSincronizacao;
+
+    quantidadeComandosPendentes: number;
+
+    comandosFila: ComandoPendente[];
+
+    comandosComErro: ComandoPendente[];
+
+    reenviarComando: (commandId: string) => Promise<void>;
+
+    descartarComando: (commandId: string) => Promise<void>;
 
     estoquePrincipal: Estoque;
 
@@ -95,13 +110,15 @@ interface AppContextValue {
         (
             solicitacao:
                 SolicitacaoMovimentoEstoquePrincipal
-        ) => void;
+        ) => Promise<void>;
 
     registrarConsumoCarrinho:
         (
             solicitacao:
                 SolicitacaoConsumoCarrinho
-        ) => void;
+        ) => Promise<void>;
+
+    sincronizarSnapshotPendente: () => Promise<void>;
 }
 
 const AppContext =
@@ -111,40 +128,6 @@ const AppContext =
 
 interface Props {
     children: ReactNode;
-}
-
-function clonarEstoque(
-    estoque: Estoque
-): Estoque {
-
-    return {
-        ...estoque,
-
-        itens:
-            estoque.itens.map(
-                (item) => ({
-                    ...item
-                })
-            )
-    };
-}
-
-function clonarReservas(
-    reservas: Reserva[]
-): Reserva[] {
-
-    return reservas.map(
-        (reserva) => ({
-            ...reserva,
-
-            historico:
-                reserva.historico?.map(
-                    (evento) => ({
-                        ...evento
-                    })
-                )
-        })
-    );
 }
 
 export function AppProvider({
@@ -168,6 +151,8 @@ export function AppProvider({
         setEstadoSincronizacao
     ] = useState<EstadoSincronizacao>("CARREGANDO");
 
+    const [comandosFila, setComandosFila] = useState<ComandoPendente[]>([]);
+
     useEffect(
         () => {
             let ativo = true;
@@ -181,11 +166,22 @@ export function AppProvider({
                     return;
                 }
 
+                OperacaoRemotaCoordinator.registrarRevisaoAplicada(
+                    resultado.dados.revisaoServidor
+                );
                 setDados(resultado.dados);
                 setEstadoSincronizacao(
                     resultado.estadoSincronizacao
                 );
                 setHidratado(true);
+
+                if (resultado.estadoSincronizacao === "ONLINE") {
+                    void FilaComandosService.processar(
+                        "ONLINE",
+                        setEstadoSincronizacao,
+                        aplicarResultado
+                    );
+                }
             };
 
             void hidratar();
@@ -197,206 +193,231 @@ export function AppProvider({
         []
     );
 
-    useEffect(
-        () => {
-            if (
-                !hidratado ||
-                !dados
-            ) {
-                return;
-            }
+    useEffect(() => FilaComandosService.observar(setComandosFila), []);
 
-            void PersistenceService
-                .salvar(dados)
-                .catch(
-                    (erro: unknown) => {
-                        console.error(
-                            "Não foi possível salvar o estado.",
-                            erro
-                        );
-                    }
-                );
-        },
-        [
-            dados,
-            hidratado
-        ]
-    );
-
-    const atualizarDados = (
-        atualizador:
-            (
-                dadosAtuais: DadosIniciais
-            ) => DadosIniciais
-    ): void => {
-        setDados(
-            (dadosAtuais) => {
-                if (!dadosAtuais) {
-                    throw new Error(
-                        "O estado ainda não foi carregado."
-                    );
+    useEffect(() => {
+        if (!["OFFLINE", "DESATUALIZADO"].includes(estadoSincronizacao)) {
+            return;
+        }
+        const intervalo = setInterval(() => {
+            void InicializacaoService.carregar().then((resultado) => {
+                if (resultado.estadoSincronizacao !== "ONLINE") {
+                    return;
                 }
-
-                return atualizador(
-                    dadosAtuais
+                OperacaoRemotaCoordinator.registrarRevisaoAplicada(
+                    resultado.dados.revisaoServidor
                 );
-            }
+                setDados(resultado.dados);
+                setEstadoSincronizacao("ONLINE");
+                void FilaComandosService.processar(
+                    "ONLINE",
+                    setEstadoSincronizacao,
+                    aplicarResultado
+                );
+            });
+        }, 10000);
+        return () => clearInterval(intervalo);
+    }, [estadoSincronizacao]);
+
+    const salvarOffline = async (
+        tipo: Parameters<typeof FilaComandosService.adicionar>[0],
+        payload: Record<string, unknown>
+    ): Promise<void> => {
+        await FilaComandosService.adicionar(tipo, payload);
+        throw new Error(
+            "Operação salva offline e mantida como pendente. O saldo ainda não foi atualizado."
         );
+    };
+
+    const aplicarResultado = (
+        resultado: ResultadoOperacao
+    ): void => {
+        if (resultado.tipo === "REJEITADA") {
+            throw resultado.erro;
+        }
+
+        if (resultado.tipo === "POST_AMBIGUO") {
+            setEstadoSincronizacao("OFFLINE");
+            throw resultado.erro;
+        }
+
+        if (resultado.tipo === "CONFIRMADA_PENDENTE_SNAPSHOT") {
+            setEstadoSincronizacao("DESATUALIZADO");
+            return;
+        }
+
+        OperacaoRemotaCoordinator.registrarRevisaoAplicada(
+            resultado.dados.revisaoServidor
+        );
+        setDados((dadosAtuais) =>
+            dadosAtuais === null ||
+            resultado.dados.revisaoServidor >= dadosAtuais.revisaoServidor
+                ? resultado.dados
+                : dadosAtuais
+        );
+        setEstadoSincronizacao("ONLINE");
+
+        if (!resultado.cacheAtualizado) {
+            console.error(
+                "Snapshot aplicado, mas não foi possível atualizar o cache.",
+                resultado.erroCache
+            );
+        }
     };
 
     const registrarRetirada = (
         retirada: RetiradaEstoque
     ): Promise<void> => {
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("RETIRADA", {
+                responsavelId: retirada.responsavelId,
+                itens: retirada.itens.map(({ produtoId, quantidade }) => ({ produtoId, quantidade })),
+                data: retirada.data.toISOString(),
+                observacao: retirada.observacao
+            });
+        }
         return RetiradaRemotaService
             .registrar(
                 retirada,
-                estadoSincronizacao
+                estadoSincronizacao,
+                setEstadoSincronizacao
             )
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .then(aplicarResultado);
     };
 
     const registrarAbastecimento = (
         abastecimento: Abastecimento
     ): Promise<void> => {
-        return AbastecimentoRemotoService
-            .registrar(abastecimento, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("ABASTECIMENTO", {
+                responsavelId: abastecimento.responsavelId,
+                local: abastecimento.localId,
+                itens: abastecimento.itens.map((item) => ({ ...item })),
+                data: abastecimento.data.toISOString(),
+                observacao: abastecimento.observacao
             });
+        }
+        return AbastecimentoRemotoService
+            .registrar(abastecimento, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const criarReserva = (
         reserva: Reserva
     ): Promise<void> => {
-        return ReservaRemotaService
-            .criar(reserva, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("CRIAR_RESERVA", {
+                responsavelId: reserva.responsavelId,
+                destino: reserva.destinoId,
+                produtoId: reserva.produtoId,
+                quantidade: reserva.quantidade
             });
+        }
+        return ReservaRemotaService
+            .criar(reserva, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const cancelarReserva = (
         reservaId: string,
         responsavelId: string
     ): Promise<void> => {
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("CANCELAR_RESERVA", {
+                reservaId,
+                corpo: { responsavelId }
+            });
+        }
         return ReservaRemotaService
             .cancelar(
                 reservaId,
                 responsavelId,
-                estadoSincronizacao
+                estadoSincronizacao,
+                setEstadoSincronizacao
             )
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
-            });
+            .then(aplicarResultado);
     };
 
     const registrarDevolucao = (
         devolucao: DevolucaoEstoque
     ): Promise<void> => {
-        return DevolucaoRemotaService
-            .registrar(devolucao, estadoSincronizacao)
-            .then((dadosOficiais) => {
-                setDados(dadosOficiais);
-                setEstadoSincronizacao("ONLINE");
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("DEVOLUCAO", {
+                responsavelId: devolucao.responsavelId,
+                itens: devolucao.itens.map((item) => ({
+                    produtoId: item.produtoId,
+                    quantidadeLivre: item.quantidadeLivre,
+                    reservas: item.reservas.map((reserva) => ({
+                        destino: reserva.destinoId,
+                        quantidade: reserva.quantidade
+                    }))
+                })),
+                data: devolucao.data.toISOString(),
+                observacao: devolucao.observacao
             });
+        }
+        return DevolucaoRemotaService
+            .registrar(devolucao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const registrarMovimentoEstoquePrincipal = (
         solicitacao:
             SolicitacaoMovimentoEstoquePrincipal
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const principal =
-            clonarEstoque(
-                dadosAtuais.estoquePrincipal
-            );
-
-        const movimentos = [
-            ...dadosAtuais.movimentosEstoquePrincipal
-        ];
-
-        MovimentoEstoquePrincipalService.registrar(
-            principal,
-            movimentos,
-            solicitacao
-        );
-
-        return {
-            ...dadosAtuais,
-
-            estoquePrincipal:
-                principal,
-
-            movimentosEstoquePrincipal:
-                movimentos
-        };
-        });
+    ): Promise<void> => {
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("MOVIMENTO_PRINCIPAL", {
+                tipo: solicitacao.tipo,
+                itens: solicitacao.itens.map((item) => ({ ...item })),
+                data: solicitacao.data.toISOString(),
+                observacao: solicitacao.observacao
+            });
+        }
+        return MovimentoEstoquePrincipalRemotoService
+            .registrar(solicitacao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
     };
 
     const registrarConsumoCarrinho = (
         solicitacao:
             SolicitacaoConsumoCarrinho
-    ): void => {
-
-        atualizarDados((dadosAtuais) => {
-
-        const rodrigo =
-            clonarEstoque(
-                dadosAtuais.estoqueRodrigo
-            );
-
-        const cesar =
-            clonarEstoque(
-                dadosAtuais.estoqueCesar
-            );
-
-        const consumos = [
-            ...dadosAtuais.consumosCarrinho
-        ];
-
-        const estoque =
-            solicitacao.responsavelId ===
-                UsuarioId.RODRIGO
-                ? rodrigo
-                : solicitacao.responsavelId ===
-                    UsuarioId.CESAR
-                    ? cesar
-                    : undefined;
-
-        if (!estoque) {
-
-            throw new Error(
-                "Responsável inválido."
-            );
+    ): Promise<void> => {
+        if (estadoSincronizacao === "OFFLINE") {
+            return salvarOffline("CONSUMO_CARRINHO", {
+                responsavelId: solicitacao.responsavelId,
+                itens: solicitacao.itens.map((item) => ({ ...item })),
+                data: solicitacao.data.toISOString(),
+                observacao: solicitacao.observacao
+            });
         }
+        return ConsumoCarrinhoRemotoService
+            .registrar(solicitacao, estadoSincronizacao, setEstadoSincronizacao)
+            .then(aplicarResultado);
+    };
 
-        ConsumoCarrinhoService.registrar(
-            estoque,
-            consumos,
-            solicitacao
+    const sincronizarSnapshotPendente = (): Promise<void> => {
+        return OperacaoRemotaCoordinator
+            .sincronizarPendente(setEstadoSincronizacao)
+            .then(aplicarResultado);
+    };
+
+    const reenviarComando = (commandId: string): Promise<void> =>
+        FilaComandosService.reenviar(
+            commandId,
+            estadoSincronizacao,
+            setEstadoSincronizacao,
+            aplicarResultado
         );
 
-        return {
-            ...dadosAtuais,
-
-            estoqueRodrigo:
-                rodrigo,
-
-            estoqueCesar:
-                cesar,
-
-            consumosCarrinho:
-                consumos
-        };
-        });
+    const descartarComando = async (commandId: string): Promise<void> => {
+        await FilaComandosService.descartar(commandId);
+        if (estadoSincronizacao === "ONLINE") {
+            await FilaComandosService.processar(
+                "ONLINE",
+                setEstadoSincronizacao,
+                aplicarResultado
+            );
+        }
     };
 
     if (
@@ -411,6 +432,20 @@ export function AppProvider({
             value={{
 
                 estadoSincronizacao,
+
+                quantidadeComandosPendentes: comandosFila.filter(
+                    (comando) => !["ERRO", "CONFLITO"].includes(comando.status)
+                ).length,
+
+                comandosFila,
+
+                comandosComErro: comandosFila.filter(
+                    (comando) => ["ERRO", "CONFLITO"].includes(comando.status)
+                ),
+
+                reenviarComando,
+
+                descartarComando,
 
                 estoquePrincipal:
                     dados.estoquePrincipal,
@@ -451,13 +486,38 @@ export function AppProvider({
 
                 registrarMovimentoEstoquePrincipal,
 
-                registrarConsumoCarrinho
+                registrarConsumoCarrinho,
+
+                sincronizarSnapshotPendente
             }}
         >
+            {comandosFila.length > 0 && (
+                <View style={styles.fila}>
+                    <Text style={styles.textoFila}>
+                        {comandosFila.filter((item) => !["ERRO", "CONFLITO"].includes(item.status)).length} operação(ões) pendente(s). O saldo exibido ainda é o último confirmado.
+                        {comandosFila.some((item) => ["ERRO", "CONFLITO"].includes(item.status))
+                            ? ` ${comandosFila.filter((item) => ["ERRO", "CONFLITO"].includes(item.status)).length} requer(em) atenção.`
+                            : ""}
+                    </Text>
+                </View>
+            )}
             {children}
         </AppContext.Provider>
     );
 }
+
+const styles = StyleSheet.create({
+    fila: {
+        backgroundColor: "#FFF3CD",
+        paddingHorizontal: 12,
+        paddingVertical: 6
+    },
+    textoFila: {
+        color: "#664D03",
+        fontSize: 12,
+        textAlign: "center"
+    }
+});
 
 export function useApp():
     AppContextValue {

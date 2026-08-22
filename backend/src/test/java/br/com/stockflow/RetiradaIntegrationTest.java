@@ -70,6 +70,7 @@ class RetiradaIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request("RODRIGO", itens("MIX", 10))))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").isNumber())
                 .andExpect(jsonPath("$.responsavelId").value("RODRIGO"))
                 .andExpect(jsonPath("$.estoqueOrigemId").value("ESTOQUE_PRINCIPAL"))
                 .andExpect(jsonPath("$.estoqueDestinoId").value("ESTOQUE_RODRIGO"));

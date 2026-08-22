@@ -7,6 +7,7 @@ import java.util.UUID;
 import br.com.stockflow.reserva.DestinoReserva;
 
 public record DevolucaoResponse(
+        long revisao,
         UUID id,
         String responsavelId,
         String estoqueOrigemId,
@@ -16,8 +17,9 @@ public record DevolucaoResponse(
         String observacao
 ) {
 
-    public static DevolucaoResponse de(Devolucao devolucao) {
+    public static DevolucaoResponse de(Devolucao devolucao, long revisao) {
         return new DevolucaoResponse(
+                revisao,
                 devolucao.getId(),
                 devolucao.getResponsavel().getId(),
                 devolucao.getEstoqueOrigem().getId(),

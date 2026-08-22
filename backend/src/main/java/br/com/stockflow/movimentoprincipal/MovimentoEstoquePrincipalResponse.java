@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record MovimentoEstoquePrincipalResponse(
+        long revisao,
         UUID id,
         TipoMovimentoEstoquePrincipal tipo,
         List<Item> itens,
@@ -13,9 +14,11 @@ public record MovimentoEstoquePrincipalResponse(
 ) {
 
     public static MovimentoEstoquePrincipalResponse de(
-            MovimentoEstoquePrincipal movimento
+            MovimentoEstoquePrincipal movimento,
+            long revisao
     ) {
         return new MovimentoEstoquePrincipalResponse(
+                revisao,
                 movimento.getId(),
                 movimento.getTipo(),
                 movimento.getItens().stream().map(Item::de).toList(),

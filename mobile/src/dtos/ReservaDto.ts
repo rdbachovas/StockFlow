@@ -1,4 +1,5 @@
 export interface CriarReservaRequestDto {
+    commandId: string;
     responsavelId: string;
     destino: string;
     produtoId: string;
@@ -6,10 +7,12 @@ export interface CriarReservaRequestDto {
 }
 
 export interface CancelarReservaRequestDto {
+    commandId: string;
     responsavelId: string;
 }
 
 export interface ReservaResponseDto {
+    revisao: number;
     id: string;
     responsavelId: string;
     destino: string;

@@ -30,6 +30,13 @@ function validar(snapshot: unknown): asserts snapshot is SnapshotDto {
         throw new Error("Snapshot inválido.");
     }
 
+    if (
+        typeof snapshot.revisao !== "number" ||
+        !inteiroNaoNegativo(snapshot.revisao)
+    ) {
+        throw new Error("Snapshot contém revisão inválida.");
+    }
+
     const colecoes = [
         "estoques",
         "reservas",
@@ -127,6 +134,7 @@ export class SnapshotMapper {
         });
 
         const dados: DadosIniciais = {
+            revisaoServidor: valor.revisao,
             estoquePrincipal: mapearEstoque(estoquePrincipal),
             estoqueRodrigo: mapearEstoque(estoqueRodrigo),
             estoqueCesar: mapearEstoque(estoqueCesar),

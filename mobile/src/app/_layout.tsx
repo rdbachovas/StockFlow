@@ -99,6 +99,13 @@ export default function RootLayout() {
                     }}
                 />
 
+                <Stack.Screen
+                    name="sincronizacao"
+                    options={{
+                        title: "Sincronização"
+                    }}
+                />
+
             </Stack>
 
         </AppProvider>

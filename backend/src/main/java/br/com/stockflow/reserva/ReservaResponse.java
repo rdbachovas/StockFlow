@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record ReservaResponse(
+        long revisao,
         UUID id,
         String responsavelId,
         DestinoReserva destino,
@@ -18,8 +19,9 @@ public record ReservaResponse(
         List<Evento> eventos
 ) {
 
-    public static ReservaResponse de(Reserva reserva) {
+    public static ReservaResponse de(Reserva reserva, long revisao) {
         return new ReservaResponse(
+                revisao,
                 reserva.getId(),
                 reserva.getResponsavel().getId(),
                 reserva.getDestino(),

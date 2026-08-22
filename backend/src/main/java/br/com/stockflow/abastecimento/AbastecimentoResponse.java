@@ -6,6 +6,7 @@ import java.util.UUID;
 
 
 public record AbastecimentoResponse(
+        long revisao,
         UUID id,
         String responsavelId,
         String estoqueOrigemId,
@@ -16,8 +17,12 @@ public record AbastecimentoResponse(
         String observacao
 ) {
 
-    public static AbastecimentoResponse de(Abastecimento abastecimento) {
+    public static AbastecimentoResponse de(
+            Abastecimento abastecimento,
+            long revisao
+    ) {
         return new AbastecimentoResponse(
+                revisao,
                 abastecimento.getId(),
                 abastecimento.getResponsavel().getId(),
                 abastecimento.getEstoqueOrigem().getId(),

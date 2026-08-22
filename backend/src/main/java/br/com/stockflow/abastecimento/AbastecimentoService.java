@@ -14,6 +14,8 @@ import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.reserva.DestinoReserva;
 import br.com.stockflow.reserva.Reserva;
 import br.com.stockflow.reserva.ReservaRepository;
+import br.com.stockflow.revisao.RevisaoService;
+import br.com.stockflow.idempotencia.IdempotenciaService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,21 +40,34 @@ public class AbastecimentoService {
     private final EstoqueItemRepository estoqueItemRepository;
     private final ReservaRepository reservaRepository;
     private final AbastecimentoRepository abastecimentoRepository;
+    private final RevisaoService revisaoService;
+    private final IdempotenciaService idempotenciaService;
 
     public AbastecimentoService(
             EstoqueRepository estoqueRepository,
             EstoqueItemRepository estoqueItemRepository,
             ReservaRepository reservaRepository,
-            AbastecimentoRepository abastecimentoRepository
+            AbastecimentoRepository abastecimentoRepository,
+            RevisaoService revisaoService,
+            IdempotenciaService idempotenciaService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.estoqueItemRepository = estoqueItemRepository;
         this.reservaRepository = reservaRepository;
         this.abastecimentoRepository = abastecimentoRepository;
+        this.revisaoService = revisaoService;
+        this.idempotenciaService = idempotenciaService;
     }
 
     @Transactional
     public AbastecimentoResponse registrar(AbastecimentoRequest request) {
+        return idempotenciaService.executar(
+                request.commandId(), "ABASTECIMENTO", AbastecimentoResponse.class,
+                () -> registrarNovo(request), AbastecimentoResponse::revisao
+        );
+    }
+
+    private AbastecimentoResponse registrarNovo(AbastecimentoRequest request) {
         DestinoReserva destinoReserva = request.local().destinoReserva();
         validarResponsavel(request.responsavelId(), destinoReserva);
 
@@ -135,7 +150,8 @@ public class AbastecimentoService {
         }
 
         return AbastecimentoResponse.de(
-                abastecimentoRepository.save(abastecimento)
+                abastecimentoRepository.save(abastecimento),
+                revisaoService.avancar()
         );
     }
 

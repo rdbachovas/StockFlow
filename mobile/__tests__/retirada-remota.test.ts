@@ -12,6 +12,7 @@ import { RetiradaEstoque } from "../src/models/RetiradaEstoque";
 import { ApiService, ErroApi } from "../src/services/ApiService";
 import { PersistenceService } from "../src/services/PersistenceService";
 import { RetiradaRemotaService } from "../src/services/RetiradaRemotaService";
+import { OperacaoRemotaCoordinator } from "../src/services/OperacaoRemotaCoordinator";
 import { RetiradaEstoqueService } from "../src/services/RetiradaEstoqueService";
 
 jest.mock(
@@ -41,6 +42,7 @@ function retirada(
 
 function snapshot(): SnapshotDto {
     return {
+        revisao: 1,
         estoques: [
             { id: "ESTOQUE_PRINCIPAL", nome: "Principal", responsavelId: null, itens: [{ produtoId: "MIX", nome: "Mix", grupo: "PELUCIA", quantidade: 8 }] },
             { id: "ESTOQUE_RODRIGO", nome: "Rodrigo", responsavelId: "RODRIGO", itens: [{ produtoId: "MIX", nome: "Mix", grupo: "PELUCIA", quantidade: 2 }] },
@@ -58,11 +60,12 @@ function snapshot(): SnapshotDto {
 
 describe("retirada remota", () => {
     afterEach(() => {
+        OperacaoRemotaCoordinator.descartarIntencaoAmbigua("retirada");
         jest.restoreAllMocks();
     });
 
     test("retirada válida chama POST", async () => {
-        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
@@ -72,7 +75,7 @@ describe("retirada remota", () => {
     });
 
     test("retirada remota para Cesar envia a intenção correta", async () => {
-        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
@@ -85,7 +88,7 @@ describe("retirada remota", () => {
     });
 
     test("retirada remota envia múltiplos produtos em uma operação", async () => {
-        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        const post = jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
         const itens = [
@@ -100,22 +103,28 @@ describe("retirada remota", () => {
     });
 
     test("sucesso atualiza pelo snapshot oficial", async () => {
-        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(8);
         expect(dados.retiradas[0].id).toBe("backend-id");
     });
 
     test("sucesso persiste novo cache", async () => {
-        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         const salvar = jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
+        const dados = resultado.dados;
 
         expect(salvar).toHaveBeenCalledWith(dados);
     });
@@ -172,7 +181,7 @@ describe("retirada remota", () => {
         });
         const post = jest.spyOn(ApiService, "registrarRetirada").mockImplementation(async () => {
             await pendente;
-            return {} as never;
+            return { revisao: 1 } as never;
         });
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
@@ -185,13 +194,15 @@ describe("retirada remota", () => {
     });
 
     test("datas do snapshot continuam como Date", async () => {
-        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({} as never);
+        jest.spyOn(ApiService, "registrarRetirada").mockResolvedValue({ revisao: 1 } as never);
         jest.spyOn(ApiService, "obterSnapshot").mockResolvedValue(snapshot());
         jest.spyOn(PersistenceService, "salvar").mockResolvedValue();
 
-        const dados = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        const resultado = await RetiradaRemotaService.registrar(retirada(), "ONLINE");
+        expect(resultado.tipo).toBe("CONFIRMADA");
+        if (resultado.tipo !== "CONFIRMADA") return;
 
-        expect(dados.retiradas[0].data).toBeInstanceOf(Date);
+        expect(resultado.dados.retiradas[0].data).toBeInstanceOf(Date);
     });
 
     test("offline não registra localmente nem chama o backend", async () => {

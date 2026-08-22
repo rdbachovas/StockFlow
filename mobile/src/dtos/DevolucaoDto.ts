@@ -10,6 +10,7 @@ export interface ItemDevolucaoRequestDto {
 }
 
 export interface RegistrarDevolucaoRequestDto {
+    commandId: string;
     responsavelId: string;
     itens: ItemDevolucaoRequestDto[];
     data: string;
@@ -17,5 +18,6 @@ export interface RegistrarDevolucaoRequestDto {
 }
 
 export interface RegistrarDevolucaoResponseDto {
+    revisao: number;
     id: string;
 }

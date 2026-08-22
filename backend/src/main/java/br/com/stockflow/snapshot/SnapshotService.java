@@ -15,6 +15,8 @@ import br.com.stockflow.reserva.Reserva;
 import br.com.stockflow.reserva.ReservaRepository;
 import br.com.stockflow.retirada.Retirada;
 import br.com.stockflow.retirada.RetiradaRepository;
+import br.com.stockflow.revisao.RevisaoService;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class SnapshotService {
     private final DevolucaoRepository devolucaoRepository;
     private final MovimentoEstoquePrincipalRepository movimentoRepository;
     private final ConsumoCarrinhoRepository consumoRepository;
+    private final RevisaoService revisaoService;
 
     public SnapshotService(
             EstoqueRepository estoqueRepository,
@@ -36,7 +39,8 @@ public class SnapshotService {
             AbastecimentoRepository abastecimentoRepository,
             DevolucaoRepository devolucaoRepository,
             MovimentoEstoquePrincipalRepository movimentoRepository,
-            ConsumoCarrinhoRepository consumoRepository
+            ConsumoCarrinhoRepository consumoRepository,
+            RevisaoService revisaoService
     ) {
         this.estoqueRepository = estoqueRepository;
         this.reservaRepository = reservaRepository;
@@ -45,11 +49,13 @@ public class SnapshotService {
         this.devolucaoRepository = devolucaoRepository;
         this.movimentoRepository = movimentoRepository;
         this.consumoRepository = consumoRepository;
+        this.revisaoService = revisaoService;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public SnapshotResponse obter() {
         return new SnapshotResponse(
+                revisaoService.atual(),
                 estoqueRepository.findAllByOrderByIdAsc().stream()
                         .map(SnapshotResponse.EstoqueDto::de)
                         .toList(),

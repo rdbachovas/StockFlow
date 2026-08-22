@@ -87,6 +87,7 @@ class ReservaIntegrationTest {
     void criaReservaValidaParaRodrigo() throws Exception {
         criarReserva("RODRIGO", "BOULEVARD", "MIX", 30)
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").isNumber())
                 .andExpect(jsonPath("$.responsavelId").value("RODRIGO"))
                 .andExpect(jsonPath("$.destino").value("BOULEVARD"))
                 .andExpect(jsonPath("$.quantidadeRestante").value(30))
