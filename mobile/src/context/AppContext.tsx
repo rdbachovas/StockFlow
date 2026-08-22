@@ -52,7 +52,13 @@ interface AppContextValue {
 
     quantidadeComandosPendentes: number;
 
+    comandosFila: ComandoPendente[];
+
     comandosComErro: ComandoPendente[];
+
+    reenviarComando: (commandId: string) => Promise<void>;
+
+    descartarComando: (commandId: string) => Promise<void>;
 
     estoquePrincipal: Estoque;
 
@@ -190,7 +196,7 @@ export function AppProvider({
     useEffect(() => FilaComandosService.observar(setComandosFila), []);
 
     useEffect(() => {
-        if (estadoSincronizacao !== "OFFLINE") {
+        if (!["OFFLINE", "DESATUALIZADO"].includes(estadoSincronizacao)) {
             return;
         }
         const intervalo = setInterval(() => {
@@ -395,6 +401,25 @@ export function AppProvider({
             .then(aplicarResultado);
     };
 
+    const reenviarComando = (commandId: string): Promise<void> =>
+        FilaComandosService.reenviar(
+            commandId,
+            estadoSincronizacao,
+            setEstadoSincronizacao,
+            aplicarResultado
+        );
+
+    const descartarComando = async (commandId: string): Promise<void> => {
+        await FilaComandosService.descartar(commandId);
+        if (estadoSincronizacao === "ONLINE") {
+            await FilaComandosService.processar(
+                "ONLINE",
+                setEstadoSincronizacao,
+                aplicarResultado
+            );
+        }
+    };
+
     if (
         !hidratado ||
         !dados
@@ -409,12 +434,18 @@ export function AppProvider({
                 estadoSincronizacao,
 
                 quantidadeComandosPendentes: comandosFila.filter(
-                    (comando) => comando.status !== "ERRO"
+                    (comando) => !["ERRO", "CONFLITO"].includes(comando.status)
                 ).length,
 
+                comandosFila,
+
                 comandosComErro: comandosFila.filter(
-                    (comando) => comando.status === "ERRO"
+                    (comando) => ["ERRO", "CONFLITO"].includes(comando.status)
                 ),
+
+                reenviarComando,
+
+                descartarComando,
 
                 estoquePrincipal:
                     dados.estoquePrincipal,
@@ -463,9 +494,9 @@ export function AppProvider({
             {comandosFila.length > 0 && (
                 <View style={styles.fila}>
                     <Text style={styles.textoFila}>
-                        {comandosFila.filter((item) => item.status !== "ERRO").length} operação(ões) pendente(s). O saldo exibido ainda é o último confirmado.
-                        {comandosFila.some((item) => item.status === "ERRO")
-                            ? ` ${comandosFila.filter((item) => item.status === "ERRO").length} com erro.`
+                        {comandosFila.filter((item) => !["ERRO", "CONFLITO"].includes(item.status)).length} operação(ões) pendente(s). O saldo exibido ainda é o último confirmado.
+                        {comandosFila.some((item) => ["ERRO", "CONFLITO"].includes(item.status))
+                            ? ` ${comandosFila.filter((item) => ["ERRO", "CONFLITO"].includes(item.status)).length} requer(em) atenção.`
                             : ""}
                     </Text>
                 </View>

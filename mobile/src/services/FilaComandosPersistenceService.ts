@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ComandoPendente } from "../models/ComandoPendente";
 
 export const CHAVE_FILA_COMANDOS = "@stockflow/fila-comandos";
-export const VERSAO_FILA_COMANDOS = 1;
+export const VERSAO_FILA_COMANDOS = 2;
 
 interface EnvelopeFila {
     versao: number;
@@ -22,7 +22,7 @@ export class FilaComandosPersistenceService {
         try {
             const envelope = JSON.parse(conteudo) as Partial<EnvelopeFila>;
             if (
-                envelope.versao !== VERSAO_FILA_COMANDOS ||
+                ![1, VERSAO_FILA_COMANDOS].includes(envelope.versao ?? 0) ||
                 !Array.isArray(envelope.comandos)
             ) {
                 return [];
@@ -65,7 +65,7 @@ export class FilaComandosPersistenceService {
             comando.payload !== null &&
             typeof comando.dataCriacao === "string" &&
             typeof comando.tentativas === "number" &&
-            ["PENDENTE", "ENVIANDO", "CONFIRMADO", "ERRO"].includes(
+            ["PENDENTE", "ENVIANDO", "CONFIRMADO", "ERRO", "CONFLITO"].includes(
                 comando.status as string
             )
         );

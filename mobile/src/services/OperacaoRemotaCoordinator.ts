@@ -52,6 +52,23 @@ export class OperacaoRemotaCoordinator {
         }
     }
 
+    static obterMaiorRevisaoAplicada(): number {
+        return this.maiorRevisaoAplicada;
+    }
+
+    static sincronizarEstadoOficial(
+        atualizarEstado?: AtualizarEstado
+    ): Promise<ResultadoOperacao> {
+        return this.enfileirar(async () => {
+            this.revisaoMinimaPendente = Math.max(
+                this.revisaoMinimaPendente ?? 0,
+                this.maiorRevisaoAplicada
+            );
+            atualizarEstado?.("SINCRONIZANDO");
+            return await this.sincronizarAposConfirmacao(atualizarEstado);
+        });
+    }
+
     private static enfileirar<T>(tarefa: () => Promise<T>): Promise<T> {
         const resultado = this.fila.then(tarefa, tarefa);
         this.fila = resultado.then(() => undefined, () => undefined);

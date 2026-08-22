@@ -6,7 +6,7 @@ import {
     View
 } from "react-native";
 
-import { useRouter } from "expo-router";
+import { Href, useRouter } from "expo-router";
 
 import { Screen } from "../../components/layout/Screen";
 import { Section } from "../../components/layout/Section";
@@ -43,6 +43,10 @@ export default function OperationsPage() {
 
             <Section title="Planejamento">
                 <Button label="Criar ou consultar reservas" variant="secondary" onPress={() => router.push("/reservas")} />
+            </Section>
+
+            <Section title="Sincronização">
+                <Button label="Ver fila de operações" variant="secondary" onPress={() => router.push("/sincronizacao" as Href)} />
             </Section>
         </Screen>
     );

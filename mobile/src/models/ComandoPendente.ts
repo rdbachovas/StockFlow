@@ -12,7 +12,8 @@ export type StatusComandoPendente =
     | "PENDENTE"
     | "ENVIANDO"
     | "CONFIRMADO"
-    | "ERRO";
+    | "ERRO"
+    | "CONFLITO";
 
 export type ComandoPendente =
     | Comando<"RETIRADA", RegistrarRetiradaRequestDto>
@@ -31,6 +32,8 @@ interface Comando<Tipo extends string, Payload> {
     status: StatusComandoPendente;
     tentativas: number;
     erro?: string;
+    motivo?: string;
+    revisaoConhecida?: number;
 }
 
 export interface PayloadCancelamentoReserva {

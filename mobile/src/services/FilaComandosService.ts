@@ -3,7 +3,7 @@ import {
     TipoComandoPendente
 } from "../models/ComandoPendente";
 import { gerarCommandId } from "../utils/CommandId";
-import { ApiService } from "./ApiService";
+import { ApiService, ErroApi } from "./ApiService";
 import type { EstadoSincronizacao } from "./InicializacaoService";
 import {
     OperacaoRemotaCoordinator,
@@ -85,6 +85,41 @@ export class FilaComandosService {
         return this.processando;
     }
 
+    static async reenviar(
+        commandId: string,
+        estado: EstadoSincronizacao,
+        atualizarEstado?: (estado: EstadoSincronizacao) => void,
+        aplicarResultado?: (resultado: ResultadoOperacao) => void
+    ): Promise<void> {
+        await this.carregar();
+        const comando = this.comandos.find((item) => item.commandId === commandId);
+        if (
+            comando === undefined ||
+            !["ERRO", "CONFLITO"].includes(comando.status)
+        ) {
+            throw new Error("Este comando não está disponível para reenvio.");
+        }
+        await this.atualizar(commandId, {
+            status: "PENDENTE",
+            erro: undefined,
+            motivo: undefined
+        });
+        await this.processar(estado, atualizarEstado, aplicarResultado);
+    }
+
+    static async descartar(commandId: string): Promise<void> {
+        await this.carregar();
+        const comando = this.comandos.find((item) => item.commandId === commandId);
+        if (
+            comando === undefined ||
+            !["ERRO", "CONFLITO"].includes(comando.status)
+        ) {
+            throw new Error("Somente comandos que exigem atenção podem ser descartados.");
+        }
+        this.aguardandoSnapshot.delete(commandId);
+        await this.remover(commandId);
+    }
+
     private static async processarInternamente(
         estado: EstadoSincronizacao,
         atualizarEstado?: (estado: EstadoSincronizacao) => void,
@@ -96,8 +131,8 @@ export class FilaComandosService {
         }
 
         for (const comando of [...this.comandos]) {
-            if (comando.status === "ERRO") {
-                continue;
+            if (["ERRO", "CONFLITO"].includes(comando.status)) {
+                return;
             }
 
             let resultado: ResultadoOperacao;
@@ -109,7 +144,8 @@ export class FilaComandosService {
                 await this.atualizar(comando.commandId, {
                     status: "ENVIANDO",
                     tentativas: comando.tentativas + 1,
-                    erro: undefined
+                    erro: undefined,
+                    motivo: undefined
                 });
                 resultado = await OperacaoRemotaCoordinator.executar(
                     () => this.enviar(comando),
@@ -128,21 +164,41 @@ export class FilaComandosService {
 
             if (resultado.tipo === "CONFIRMADA_PENDENTE_SNAPSHOT") {
                 this.aguardandoSnapshot.add(comando.commandId);
-                await this.atualizar(comando.commandId, { status: "ENVIANDO" });
+                await this.atualizar(comando.commandId, {
+                    status: "ENVIANDO",
+                    erro: resultado.erro.message,
+                    motivo: "A operação foi confirmada, mas o snapshot oficial ainda não pôde ser sincronizado.",
+                    revisaoConhecida: OperacaoRemotaCoordinator.obterMaiorRevisaoAplicada()
+                });
                 aplicarResultado?.(resultado);
                 return;
             }
 
             if (resultado.tipo === "POST_AMBIGUO") {
-                await this.atualizar(comando.commandId, { status: "PENDENTE" });
+                await this.atualizar(comando.commandId, {
+                    status: "PENDENTE",
+                    erro: resultado.erro.message,
+                    motivo: "Não foi possível saber se o servidor recebeu a operação. O próximo envio reutilizará o mesmo commandId."
+                });
                 return;
             }
 
+            const conflito = resultado.erro instanceof ErroApi &&
+                resultado.erro.status === 409;
             await this.atualizar(comando.commandId, {
-                status: "ERRO",
-                erro: resultado.erro.message
+                status: conflito ? "CONFLITO" : "ERRO",
+                erro: resultado.erro.message,
+                motivo: conflito
+                    ? "O estado do servidor mudou e esta intenção precisa ser revisada."
+                    : "O servidor rejeitou esta intenção. Revise ou descarte antes de continuar.",
+                revisaoConhecida: OperacaoRemotaCoordinator.obterMaiorRevisaoAplicada()
             });
+            return;
         }
+
+        const reconciliacao = await OperacaoRemotaCoordinator
+            .sincronizarEstadoOficial(atualizarEstado);
+        aplicarResultado?.(reconciliacao);
     }
 
     private static enviar(comando: ComandoPendente): Promise<unknown> {
