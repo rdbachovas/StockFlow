@@ -31,9 +31,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const restaurarSessao = async (): Promise<void> => {
         setEstado("CARREGANDO");
-        const restaurado = await AuthService.restaurarSessao();
-        setUsuario(restaurado);
-        setEstado(restaurado ? "AUTENTICADO" : "NAO_AUTENTICADO");
+        try {
+            const restaurado = await AuthService.restaurarSessao();
+            setUsuario(restaurado);
+            setEstado(restaurado ? "AUTENTICADO" : "NAO_AUTENTICADO");
+        } catch (erro) {
+            setUsuario(undefined);
+            setEstado("NAO_AUTENTICADO");
+            throw erro;
+        }
     };
 
     useEffect(() => {
@@ -41,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUsuario(undefined);
             setEstado("NAO_AUTENTICADO");
         });
-        void restaurarSessao();
+        void restaurarSessao().catch(() => undefined);
         return parar;
     }, []);
 

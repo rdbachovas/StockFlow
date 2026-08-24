@@ -3,6 +3,7 @@ import { SessaoUsuario } from "../models/SessaoUsuario";
 import { ApiService } from "./ApiService";
 import { SessaoService } from "./SessaoService";
 import { TokenStorageService } from "./TokenStorageService";
+import { ErroApi } from "./ErroApi";
 
 export class AuthService {
     static async login(login: string, senha: string): Promise<SessaoUsuario> {
@@ -24,9 +25,14 @@ export class AuthService {
             const usuario = await ApiService.me();
             SessaoService.definirUsuario(usuario);
             return usuario;
-        } catch {
-            await SessaoService.encerrar();
-            return undefined;
+        } catch (erro) {
+            if (
+                erro instanceof ErroApi &&
+                (erro.status === 400 || erro.tipo === "HTTP_401")
+            ) {
+                return undefined;
+            }
+            throw erro;
         }
     }
 

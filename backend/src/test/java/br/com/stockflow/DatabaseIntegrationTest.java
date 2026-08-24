@@ -3,6 +3,8 @@ package br.com.stockflow;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -100,6 +102,66 @@ class DatabaseIntegrationTest {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+        mockMvc.perform(get("/api/v1/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    void healthNaoExpoeSegredos() throws Exception {
+        String resposta = mockMvc.perform(get("/api/v1/health/readiness"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(resposta)
+                .doesNotContain(POSTGRESQL.getJdbcUrl())
+                .doesNotContain(POSTGRESQL.getUsername())
+                .doesNotContain(POSTGRESQL.getPassword())
+                .doesNotContain("segredo-exclusivo-para-testes");
+    }
+
+    @Test
+    void corsAceitaOriginAutorizada() throws Exception {
+        mockMvc.perform(get("/api/v1/estoques")
+                        .header("Origin", "https://web.stockflow.test")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "https://web.stockflow.test"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials", "true"
+                ));
+    }
+
+    @Test
+    void corsRejeitaOriginNaoAutorizada() throws Exception {
+        mockMvc.perform(get("/api/v1/estoques")
+                        .header("Origin", "https://hostil.test"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist(
+                        "Access-Control-Allow-Origin"
+                ));
+    }
+
+    @Test
+    void preflightAutorizadoFunciona() throws Exception {
+        mockMvc.perform(options("/api/v1/retiradas")
+                        .header("Origin", "https://web.stockflow.test")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header(
+                                "Access-Control-Request-Headers",
+                                "Authorization, Content-Type"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "https://web.stockflow.test"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Methods",
+                        org.hamcrest.Matchers.containsString("POST")
+                ));
     }
 
     @Test

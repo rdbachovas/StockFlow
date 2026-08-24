@@ -1,10 +1,16 @@
 spring:
   application:
     name: stockflow-backend
+  profiles:
+    default: dev
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/stockflow}
-    username: ${DB_USERNAME:stockflow}
-    password: ${DB_PASSWORD:stockflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:10000}
+      validation-timeout: ${DB_POOL_VALIDATION_TIMEOUT_MS:3000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1800000}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -14,10 +20,28 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      base-path: /api/v1
+      exposure:
+        include: health
+      path-mapping:
+        health: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,stockFlowReadiness
 
 stockflow:
   auth:
@@ -27,3 +51,6 @@ stockflow:
     initial-passwords:
       rodrigo: ${AUTH_INITIAL_PASSWORD_RODRIGO:}
       cesar: ${AUTH_INITIAL_PASSWORD_CESAR:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    allow-credentials: true

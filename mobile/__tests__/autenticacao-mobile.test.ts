@@ -41,6 +41,7 @@ describe("autenticação mobile", () => {
         jest.clearAllMocks();
         SessaoService.reiniciarParaTestes();
         process.env.EXPO_PUBLIC_API_URL = "http://localhost:8080";
+        process.env.EXPO_PUBLIC_API_TIMEOUT_MS = "10000";
         secureStore.getItemAsync.mockResolvedValue(null);
         secureStore.setItemAsync.mockResolvedValue();
         secureStore.deleteItemAsync.mockResolvedValue();
@@ -126,8 +127,51 @@ describe("autenticação mobile", () => {
     test("403 não tenta refresh", async () => {
         await SessaoService.aplicar(auth());
         jest.mocked(fetch).mockResolvedValueOnce(resposta(403, {}));
-        await expect(ApiService.obterSnapshot()).rejects.toMatchObject({ status: 403 });
+        await expect(ApiService.obterSnapshot()).rejects.toMatchObject({
+            status: 403,
+            tipo: "HTTP_403"
+        });
         expect(jest.mocked(fetch)).toHaveBeenCalledTimes(1);
+    });
+
+    test("classifica falha de rede sem confundir com HTTP", async () => {
+        jest.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+        await expect(ApiService.obterSnapshot()).rejects.toMatchObject({
+            tipo: "REDE_INDISPONIVEL",
+            status: undefined
+        });
+    });
+
+    test.each([
+        [401, "HTTP_401"],
+        [403, "HTTP_403"],
+        [422, "HTTP_4XX"],
+        [503, "HTTP_5XX"]
+    ])("classifica HTTP %s como %s", async (status, tipo) => {
+        jest.mocked(fetch).mockResolvedValueOnce(resposta(status, {}));
+
+        await expect(ApiService.login({ login: "rodrigo", senha: "senha" }))
+            .rejects.toMatchObject({ status, tipo });
+    });
+
+    test("classifica timeout e aborta request compartilhado", async () => {
+        jest.useFakeTimers();
+        process.env.EXPO_PUBLIC_API_TIMEOUT_MS = "50";
+        jest.mocked(fetch).mockImplementationOnce((_, init) =>
+            new Promise<Response>((_, rejeitar) => {
+                init?.signal?.addEventListener("abort", () => {
+                    rejeitar(new Error("abortada"));
+                });
+            })
+        );
+
+        const resultado = expect(ApiService.obterSnapshot())
+            .rejects.toMatchObject({ tipo: "TIMEOUT" });
+        await jest.advanceTimersByTimeAsync(50);
+
+        await resultado;
+        jest.useRealTimers();
     });
 
     test("Bearer é centralizado e retry preserva o commandId", async () => {
@@ -173,5 +217,37 @@ describe("autenticação mobile", () => {
         expect(jest.mocked(fetch)).toHaveBeenCalledTimes(2);
         expect(encerramento).toHaveBeenCalled();
         expect(SessaoService.obterAccessToken()).toBeUndefined();
+    });
+
+    test.each([
+        ["timeout", new ErroApi("timeout", undefined, "TIMEOUT")],
+        ["rede", new ErroApi("sem rede", undefined, "REDE_INDISPONIVEL")],
+        ["HTTP 5xx", new ErroApi("indisponível", 503)]
+    ])("%s durante refresh preserva a sessão", async (_, erro) => {
+        await SessaoService.aplicar(auth());
+        secureStore.getItemAsync.mockResolvedValue("refresh-1");
+
+        await expect(SessaoService.renovar(async () => {
+            throw erro;
+        })).rejects.toBe(erro);
+
+        expect(secureStore.deleteItemAsync).not.toHaveBeenCalled();
+        expect(SessaoService.obterAccessToken()).toBe("access-1");
+    });
+
+    test("retry posterior restaura sessão após indisponibilidade", async () => {
+        secureStore.getItemAsync.mockResolvedValue("refresh-1");
+        jest.mocked(fetch)
+            .mockRejectedValueOnce(new TypeError("sem rede"))
+            .mockResolvedValueOnce(resposta(200, auth("access-2", "refresh-2")))
+            .mockResolvedValueOnce(resposta(200, usuario));
+
+        await expect(AuthService.restaurarSessao()).rejects.toMatchObject({
+            tipo: "REDE_INDISPONIVEL"
+        });
+        expect(secureStore.deleteItemAsync).not.toHaveBeenCalled();
+
+        await expect(AuthService.restaurarSessao()).resolves.toEqual(usuario);
+        expect(SessaoService.obterAccessToken()).toBe("access-2");
     });
 });

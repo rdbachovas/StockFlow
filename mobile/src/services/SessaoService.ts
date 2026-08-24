@@ -1,6 +1,7 @@
 import { AuthResponseDto } from "../dtos/AuthDto";
 import { SessaoUsuario } from "../models/SessaoUsuario";
 import { TokenStorageService } from "./TokenStorageService";
+import { ErroApi } from "./ErroApi";
 
 type OuvinteEncerramento = () => void;
 
@@ -58,7 +59,12 @@ export class SessaoService {
             await this.aplicar(auth);
             return auth;
         } catch (erro) {
-            await this.encerrar();
+            if (
+                erro instanceof ErroApi &&
+                (erro.status === 400 || erro.tipo === "HTTP_401")
+            ) {
+                await this.encerrar();
+            }
             throw erro;
         }
     }

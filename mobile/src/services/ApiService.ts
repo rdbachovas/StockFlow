@@ -8,13 +8,9 @@ import { RegistrarRetiradaRequestDto, RegistrarRetiradaResponseDto } from "../dt
 import { SnapshotDto } from "../dtos/SnapshotDto";
 import { SessaoUsuario } from "../models/SessaoUsuario";
 import { SessaoService } from "./SessaoService";
+import { ErroApi } from "./ErroApi";
 
-export class ErroApi extends Error {
-    constructor(mensagem: string, readonly status?: number) {
-        super(mensagem);
-        this.name = "ErroApi";
-    }
-}
+export { ErroApi } from "./ErroApi";
 
 export class ApiService {
     private static apiUrl(): string {
@@ -60,11 +56,36 @@ export class ApiService {
         }
 
         const url = `${this.apiUrl()}${caminho}`;
+        const controller = new AbortController();
+        const timeoutMs = this.timeoutMs();
+        let expirou = false;
+        const timeout = setTimeout(() => {
+            expirou = true;
+            controller.abort();
+        }, timeoutMs);
+
         let resposta: Response;
         try {
-            resposta = await fetch(url, { ...init, headers });
+            resposta = await fetch(url, {
+                ...init,
+                headers,
+                signal: controller.signal
+            });
         } catch {
-            throw new ErroApi("Não foi possível conectar ao servidor.");
+            if (expirou) {
+                throw new ErroApi(
+                    "O servidor demorou demais para responder.",
+                    undefined,
+                    "TIMEOUT"
+                );
+            }
+            throw new ErroApi(
+                "Não foi possível conectar ao servidor.",
+                undefined,
+                "REDE_INDISPONIVEL"
+            );
+        } finally {
+            clearTimeout(timeout);
         }
 
         if (resposta.status === 401 && autenticada && permitirRefresh) {
@@ -74,6 +95,13 @@ export class ApiService {
             return await this.executar(caminho, init, true, false);
         }
         return resposta;
+    }
+
+    private static timeoutMs(): number {
+        const configurado = Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS);
+        return Number.isFinite(configurado) && configurado > 0
+            ? configurado
+            : 10000;
     }
 
     private static async json<T>(
