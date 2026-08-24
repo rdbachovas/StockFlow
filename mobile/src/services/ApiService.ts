@@ -1,4 +1,4 @@
-import { AuthResponseDto, LoginRequestDto, RefreshRequestDto } from "../dtos/AuthDto";
+import { AuthResponseDto, LoginRequestDto } from "../dtos/AuthDto";
 import { RegistrarAbastecimentoRequestDto, RegistrarAbastecimentoResponseDto } from "../dtos/AbastecimentoDto";
 import { RegistrarConsumoCarrinhoRequestDto, RegistrarConsumoCarrinhoResponseDto } from "../dtos/ConsumoCarrinhoDto";
 import { RegistrarDevolucaoRequestDto, RegistrarDevolucaoResponseDto } from "../dtos/DevolucaoDto";
@@ -9,6 +9,7 @@ import { SnapshotDto } from "../dtos/SnapshotDto";
 import { SessaoUsuario } from "../models/SessaoUsuario";
 import { SessaoService } from "./SessaoService";
 import { ErroApi } from "./ErroApi";
+import { refreshSessionAdapter } from "./RefreshSessionAdapter";
 
 export { ErroApi } from "./ErroApi";
 
@@ -90,7 +91,7 @@ export class ApiService {
 
         if (resposta.status === 401 && autenticada && permitirRefresh) {
             if (SessaoService.obterAccessToken() === tokenEnviado) {
-                await SessaoService.renovar((refreshToken) => this.refresh({ refreshToken }));
+                await SessaoService.renovar(() => this.refresh());
             }
             return await this.executar(caminho, init, true, false);
         }
@@ -131,16 +132,19 @@ export class ApiService {
         };
     }
 
-    static login(request: LoginRequestDto): Promise<AuthResponseDto> {
-        return this.json("/api/v1/auth/login", this.postInit(request), false);
+    static async login(request: LoginRequestDto): Promise<AuthResponseDto> {
+        const requisicao = await refreshSessionAdapter.login(request);
+        return await this.json(requisicao.caminho, requisicao.init, false);
     }
 
-    static refresh(request: RefreshRequestDto): Promise<AuthResponseDto> {
-        return this.json("/api/v1/auth/refresh", this.postInit(request), false);
+    static async refresh(): Promise<AuthResponseDto> {
+        const requisicao = await refreshSessionAdapter.refresh();
+        return await this.json(requisicao.caminho, requisicao.init, false);
     }
 
-    static logout(request: RefreshRequestDto): Promise<void> {
-        return this.semConteudo("/api/v1/auth/logout", this.postInit(request));
+    static async logout(): Promise<void> {
+        const requisicao = await refreshSessionAdapter.logout();
+        return await this.semConteudo(requisicao.caminho, requisicao.init);
     }
 
     static me(): Promise<SessaoUsuario> {

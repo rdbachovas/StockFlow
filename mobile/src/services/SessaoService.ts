@@ -1,7 +1,7 @@
 import { AuthResponseDto } from "../dtos/AuthDto";
 import { SessaoUsuario } from "../models/SessaoUsuario";
-import { TokenStorageService } from "./TokenStorageService";
 import { ErroApi } from "./ErroApi";
+import { refreshSessionAdapter } from "./RefreshSessionAdapter";
 
 type OuvinteEncerramento = () => void;
 
@@ -25,7 +25,7 @@ export class SessaoService {
     }
 
     static async aplicar(auth: AuthResponseDto): Promise<void> {
-        await TokenStorageService.salvarRefreshToken(auth.refreshToken);
+        await refreshSessionAdapter.aplicarResposta(auth);
         this.accessToken = auth.accessToken;
         this.usuario = auth.usuario;
     }
@@ -34,7 +34,7 @@ export class SessaoService {
         this.usuario = usuario;
     }
 
-    static renovar(executor: (refreshToken: string) => Promise<AuthResponseDto>): Promise<AuthResponseDto> {
+    static renovar(executor: () => Promise<AuthResponseDto>): Promise<AuthResponseDto> {
         if (this.renovacao !== undefined) {
             return this.renovacao;
         }
@@ -46,16 +46,15 @@ export class SessaoService {
     }
 
     private static async renovarInternamente(
-        executor: (refreshToken: string) => Promise<AuthResponseDto>
+        executor: () => Promise<AuthResponseDto>
     ): Promise<AuthResponseDto> {
-        const refreshToken = await TokenStorageService.obterRefreshToken();
-        if (!refreshToken) {
+        if (!await refreshSessionAdapter.podeRestaurar()) {
             await this.encerrar();
             throw new Error("Sessão expirada.");
         }
 
         try {
-            const auth = await executor(refreshToken);
+            const auth = await executor();
             await this.aplicar(auth);
             return auth;
         } catch (erro) {
@@ -72,7 +71,7 @@ export class SessaoService {
     static async encerrar(): Promise<void> {
         this.accessToken = undefined;
         this.usuario = undefined;
-        await TokenStorageService.removerRefreshToken();
+        await refreshSessionAdapter.limparSessao();
         this.ouvintes.forEach((ouvinte) => ouvinte());
     }
 

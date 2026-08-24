@@ -2,8 +2,8 @@ import { AuthResponseDto } from "../dtos/AuthDto";
 import { SessaoUsuario } from "../models/SessaoUsuario";
 import { ApiService } from "./ApiService";
 import { SessaoService } from "./SessaoService";
-import { TokenStorageService } from "./TokenStorageService";
 import { ErroApi } from "./ErroApi";
+import { refreshSessionAdapter } from "./RefreshSessionAdapter";
 
 export class AuthService {
     static async login(login: string, senha: string): Promise<SessaoUsuario> {
@@ -13,15 +13,12 @@ export class AuthService {
     }
 
     static async restaurarSessao(): Promise<SessaoUsuario | undefined> {
-        const refreshToken = await TokenStorageService.obterRefreshToken();
-        if (!refreshToken) {
+        if (!await refreshSessionAdapter.podeRestaurar()) {
             return undefined;
         }
 
         try {
-            await SessaoService.renovar((token) => ApiService.refresh({
-                refreshToken: token
-            }));
+            await SessaoService.renovar(() => ApiService.refresh());
             const usuario = await ApiService.me();
             SessaoService.definirUsuario(usuario);
             return usuario;
@@ -36,15 +33,17 @@ export class AuthService {
         }
     }
 
-    static async renovar(refreshToken: string): Promise<AuthResponseDto> {
-        return await ApiService.refresh({ refreshToken });
+    static async renovar(): Promise<AuthResponseDto> {
+        return await ApiService.refresh();
     }
 
     static async logout(): Promise<void> {
-        const refreshToken = await TokenStorageService.obterRefreshToken();
         try {
-            if (refreshToken && SessaoService.obterAccessToken()) {
-                await ApiService.logout({ refreshToken });
+            if (
+                await refreshSessionAdapter.podeRestaurar() &&
+                SessaoService.obterAccessToken()
+            ) {
+                await ApiService.logout();
             }
         } finally {
             await SessaoService.encerrar();

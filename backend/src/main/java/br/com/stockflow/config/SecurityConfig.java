@@ -1,6 +1,7 @@
 package br.com.stockflow.config;
 
 import br.com.stockflow.auth.AuthProperties;
+import br.com.stockflow.auth.AuthCookieProperties;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
@@ -22,7 +23,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@EnableConfigurationProperties(AuthProperties.class)
+@EnableConfigurationProperties({AuthProperties.class, AuthCookieProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -36,6 +37,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
+                                "/api/v1/auth/web/login",
+                                "/api/v1/auth/web/refresh",
                                 "/api/v1/health",
                                 "/api/v1/health/**"
                         ).permitAll()

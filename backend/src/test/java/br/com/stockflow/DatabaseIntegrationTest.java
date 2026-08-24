@@ -165,6 +165,32 @@ class DatabaseIntegrationTest {
     }
 
     @Test
+    void preflightWebAuthPermiteCookieEAuthorization() throws Exception {
+        mockMvc.perform(options("/api/v1/auth/web/logout")
+                        .header("Origin", "https://web.stockflow.test")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header(
+                                "Access-Control-Request-Headers",
+                                "Authorization, Content-Type"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "https://web.stockflow.test"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials", "true"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Headers",
+                        org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("Authorization"),
+                                org.hamcrest.Matchers.containsString("Content-Type")
+                        )
+                ));
+    }
+
+    @Test
     void estoquesRetornamSeedComItensDoPrincipal() throws Exception {
         mockMvc.perform(get("/api/v1/estoques")
                         .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user("RODRIGO")))

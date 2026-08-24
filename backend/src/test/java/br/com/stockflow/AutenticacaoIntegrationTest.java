@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import br.com.stockflow.auth.TokenService;
 import java.time.Instant;
 import java.util.UUID;
+import jakarta.servlet.http.Cookie;
+import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,6 +179,102 @@ class AutenticacaoIntegrationTest {
     }
 
     @Test
+    void loginWebUsaSomenteCookieHttpOnly() throws Exception {
+        MvcResult resultado = loginWeb("rodrigo", "senha-teste-rodrigo")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isString())
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                .andExpect(jsonPath("$.usuario.id").value("RODRIGO"))
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andReturn();
+
+        assertThat(cookieHeader(resultado))
+                .contains("stockflow_refresh=")
+                .contains("HttpOnly")
+                .contains("SameSite=Lax")
+                .contains("Path=/api/v1/auth/web")
+                .doesNotContain("Secure");
+    }
+
+    @Test
+    void refreshWebRotacionaCookieEImpedeReutilizacao() throws Exception {
+        MvcResult login = loginWeb("rodrigo", "senha-teste-rodrigo")
+                .andExpect(status().isOk()).andReturn();
+        String antigo = cookieValor(login);
+
+        MvcResult refresh = refreshWeb(antigo)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andReturn();
+        String novo = cookieValor(refresh);
+
+        assertThat(novo).isNotEqualTo(antigo);
+        refreshWeb(antigo)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail")
+                        .value("Credenciais ou sessão inválidas."))
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        org.hamcrest.Matchers.containsString("Max-Age=0")
+                ));
+        refreshWeb(novo).andExpect(status().isOk());
+    }
+
+    @Test
+    void logoutWebRevogaSessaoEExpiraCookie() throws Exception {
+        MvcResult login = loginWeb("cesar", "senha-teste-cesar")
+                .andExpect(status().isOk()).andReturn();
+        JsonNode corpo = objectMapper.readTree(
+                login.getResponse().getContentAsString()
+        );
+        String accessToken = corpo.get("accessToken").asText();
+        String refreshToken = cookieValor(login);
+
+        mockMvc.perform(post("/api/v1/auth/web/logout")
+                        .header("Origin", "https://web.stockflow.test")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .cookie(new Cookie("stockflow_refresh", refreshToken)))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string(
+                        HttpHeaders.SET_COOKIE,
+                        org.hamcrest.Matchers.allOf(
+                                org.hamcrest.Matchers.containsString("Max-Age=0"),
+                                org.hamcrest.Matchers.containsString("HttpOnly")
+                        )
+                ));
+
+        refreshWeb(refreshToken).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void authWebExigeOriginAutorizadaECookie() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/web/login")
+                        .header("Origin", "https://hostil.test")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"rodrigo\",\"senha\":\"senha-teste-rodrigo\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/web/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"rodrigo\",\"senha\":\"senha-teste-rodrigo\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/web/refresh")
+                        .header("Origin", "https://web.stockflow.test"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail")
+                        .value("Credenciais ou sessão inválidas."));
+    }
+
+    @Test
+    void endpointsNativeRejeitamOriginDoNavegador() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("Origin", "https://web.stockflow.test")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"rodrigo\",\"senha\":\"senha-teste-rodrigo\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void retiradaDerivaResponsavelDoJwtSemCampoNoRequest() throws Exception {
         Tokens rodrigo = tokens("rodrigo", "senha-teste-rodrigo");
         Tokens cesar = tokens("cesar", "senha-teste-cesar");
@@ -265,6 +364,34 @@ class AutenticacaoIntegrationTest {
                 .content("""
                         {"login":"%s","senha":"%s"}
                         """.formatted(login, senha)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions loginWeb(
+            String login, String senha
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/web/login")
+                .header("Origin", "https://web.stockflow.test")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"login":"%s","senha":"%s"}
+                        """.formatted(login, senha)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions refreshWeb(
+            String token
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/web/refresh")
+                .header("Origin", "https://web.stockflow.test")
+                .cookie(new Cookie("stockflow_refresh", token)));
+    }
+
+    private String cookieHeader(MvcResult resultado) {
+        return resultado.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+    }
+
+    private String cookieValor(MvcResult resultado) {
+        String primeiroCampo = cookieHeader(resultado).split(";", 2)[0];
+        return primeiroCampo.substring(primeiroCampo.indexOf('=') + 1);
     }
 
     private Tokens tokens(String login, String senha) throws Exception {

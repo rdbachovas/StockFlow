@@ -10,6 +10,9 @@ import java.sql.SQLException;
 import java.util.List;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
+import br.com.stockflow.auth.AuthCookieProperties;
+import br.com.stockflow.auth.AuthCookieService;
+import br.com.stockflow.auth.AuthProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.mock.env.MockEnvironment;
@@ -70,6 +73,25 @@ class InfraestruturaConfigTest {
     }
 
     @Test
+    void cookieDeProducaoEHttpOnlySecureSameSiteNone() {
+        AuthCookieService service = new AuthCookieService(
+                new AuthCookieProperties(
+                        "stockflow_refresh", "/api/v1/auth/web", true, "None"
+                ),
+                new AuthProperties("segredo", 900, 2592000, null)
+        );
+
+        String cookie = service.criar("refresh-secreto").toString();
+
+        assertThat(cookie)
+                .contains("HttpOnly")
+                .contains("Secure")
+                .contains("SameSite=None")
+                .contains("Path=/api/v1/auth/web")
+                .contains("Max-Age=2592000");
+    }
+
+    @Test
     void readinessFalhaQuandoBancoEstaIndisponivel() throws Exception {
         DataSource dataSource = mock(DataSource.class);
         when(dataSource.getConnection()).thenThrow(
@@ -100,6 +122,7 @@ class InfraestruturaConfigTest {
         OBRIGATORIAS.stream()
                 .filter(nome -> !nome.equals(ausente))
                 .forEach(nome -> environment.setProperty(nome, "valor-seguro"));
+        environment.setProperty("stockflow.auth.cookie.secure", "true");
 
         assertThatThrownBy(() -> new ConfiguracaoProducaoValidator(environment)
                 .afterPropertiesSet())

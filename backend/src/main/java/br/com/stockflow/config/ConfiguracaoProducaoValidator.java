@@ -33,5 +33,19 @@ public class ConfiguracaoProducaoValidator implements InitializingBean {
                 );
             }
         }
+        if (!environment.getProperty("stockflow.auth.cookie.secure", Boolean.class, false)) {
+            throw new IllegalStateException(
+                    "AUTH_COOKIE_SECURE deve ser true no profile prod."
+            );
+        }
+        String sameSite = environment.getProperty(
+                "stockflow.auth.cookie.same-site", "None"
+        );
+        if ("None".equalsIgnoreCase(sameSite)
+                && !environment.getProperty(
+                        "stockflow.auth.cookie.secure", Boolean.class, false
+                )) {
+            throw new IllegalStateException("SameSite=None exige cookie Secure.");
+        }
     }
 }

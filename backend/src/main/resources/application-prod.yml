@@ -11,5 +11,8 @@ spring:
 stockflow:
   auth:
     jwt-secret: ${AUTH_JWT_SECRET}
+    cookie:
+      secure: ${AUTH_COOKIE_SECURE:true}
+      same-site: ${AUTH_COOKIE_SAME_SITE:None}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
