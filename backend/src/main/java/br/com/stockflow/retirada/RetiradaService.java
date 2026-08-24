@@ -45,21 +45,24 @@ public class RetiradaService {
 
     @Transactional
     public RetiradaResponse registrar(RetiradaRequest request) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "RETIRADA", RetiradaResponse.class,
-                () -> registrarNova(request), RetiradaResponse::revisao
+                () -> registrarNova(request, responsavelId), RetiradaResponse::revisao
         );
     }
 
-    private RetiradaResponse registrarNova(RetiradaRequest request) {
+    private RetiradaResponse registrarNova(
+            RetiradaRequest request,
+            String responsavelId
+    ) {
         Estoque principal = estoqueRepository.findById(ESTOQUE_PRINCIPAL)
                 .orElseThrow(() -> new RegraRetiradaException(
                         "Estoque Principal não encontrado."
                 ));
 
         Estoque destino = estoqueRepository
-                .findByResponsavelId(request.responsavelId())
+                .findByResponsavelId(responsavelId)
                 .orElseThrow(() -> new RegraRetiradaException(
                         "Responsável inválido."
                 ));

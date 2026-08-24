@@ -15,7 +15,6 @@ import jakarta.validation.constraints.Size;
 
 public record DevolucaoRequest(
         @NotNull UUID commandId,
-        @NotBlank String responsavelId,
         @NotEmpty List<@Valid Item> itens,
         @NotNull OffsetDateTime data,
         @Size(max = 500) String observacao

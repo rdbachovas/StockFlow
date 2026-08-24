@@ -140,7 +140,6 @@ describe("autenticação mobile", () => {
 
         await ApiService.registrarRetirada({
             commandId: "command-estavel",
-            responsavelId: "RODRIGO",
             itens: [],
             data: new Date().toISOString()
         });
@@ -151,6 +150,10 @@ describe("autenticação mobile", () => {
         expect(chamadasOperacao).toHaveLength(2);
         expect(chamadasOperacao.map(([, init]) => JSON.parse(String(init?.body)).commandId))
             .toEqual(["command-estavel", "command-estavel"]);
+        expect(chamadasOperacao.map(([, init]) => JSON.parse(String(init?.body))))
+            .not.toEqual(expect.arrayContaining([
+                expect.objectContaining({ responsavelId: expect.anything() })
+            ]));
         expect((chamadasOperacao[0][1]?.headers as Headers).get("Authorization"))
             .toBe("Bearer access-1");
         expect((chamadasOperacao[1][1]?.headers as Headers).get("Authorization"))

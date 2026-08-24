@@ -16,12 +16,4 @@ public class IdentidadeAtual {
         }
         return authentication.getName();
     }
-
-    public void exigirIgual(String responsavelId) {
-        if (!id().equals(responsavelId)) {
-            throw new AccessDeniedException(
-                    "O usuário autenticado não pode agir por outro responsável."
-            );
-        }
-    }
 }

@@ -8,7 +8,6 @@ import jakarta.validation.constraints.Positive;
 
 public record ReservaRequest(
         @NotNull UUID commandId,
-        @NotBlank String responsavelId,
         @NotNull DestinoReserva destino,
         @NotBlank String produtoId,
         @Positive int quantidade

@@ -61,7 +61,7 @@ describe("reservas remotas", () => {
         const post = jest.spyOn(ApiService, "criarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar();
         await ReservaRemotaService.criar(reserva(), "ONLINE");
-        expect(post).toHaveBeenCalledWith({ commandId: expect.any(String), responsavelId: "RODRIGO", destino: "BOULEVARD", produtoId: "MIX", quantidade: 4 });
+        expect(post).toHaveBeenCalledWith({ commandId: expect.any(String), destino: "BOULEVARD", produtoId: "MIX", quantidade: 4 });
     });
 
     test("criação atualiza pelo snapshot", async () => {
@@ -79,7 +79,6 @@ describe("reservas remotas", () => {
         await ReservaRemotaService.criar(reserva("CESAR"), "ONLINE");
         expect(post).toHaveBeenCalledWith({
             commandId: expect.any(String),
-            responsavelId: "CESAR",
             destino: "AEROPORTO",
             produtoId: "STITCH",
             quantidade: 4
@@ -113,14 +112,14 @@ describe("reservas remotas", () => {
     test("cancelamento válido chama endpoint correto", async () => {
         const post = jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar(snapshot("CANCELADA"));
-        await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
-        expect(post).toHaveBeenCalledWith("uuid-real", { commandId: expect.any(String), responsavelId: "RODRIGO" });
+        await ReservaRemotaService.cancelar("uuid-real", "ONLINE");
+        expect(post).toHaveBeenCalledWith("uuid-real", { commandId: expect.any(String) });
     });
 
     test("cancelamento atualiza pelo snapshot", async () => {
         jest.spyOn(ApiService, "cancelarReserva").mockResolvedValue({ revisao: 1 } as never);
         preparar(snapshot("CANCELADA"));
-        const resultado = await ReservaRemotaService.cancelar("uuid-real", "RODRIGO", "ONLINE");
+        const resultado = await ReservaRemotaService.cancelar("uuid-real", "ONLINE");
         expect(resultado.tipo).toBe("CONFIRMADA");
         if (resultado.tipo !== "CONFIRMADA") return;
         const dados = resultado.dados;
@@ -131,7 +130,7 @@ describe("reservas remotas", () => {
     test("erro no cancelamento preserva estado", async () => {
         jest.spyOn(ApiService, "cancelarReserva").mockRejectedValue(new ErroApi("não cancelada", 409));
         const obter = jest.spyOn(ApiService, "obterSnapshot");
-        await expect(ReservaRemotaService.cancelar("id", "RODRIGO", "ONLINE")).rejects.toThrow("não cancelada");
+        await expect(ReservaRemotaService.cancelar("id", "ONLINE")).rejects.toThrow("não cancelada");
         expect(obter).not.toHaveBeenCalled();
     });
 
@@ -161,7 +160,7 @@ describe("reservas remotas", () => {
             const salvar = jest.spyOn(PersistenceService, "salvar");
             const local = jest.spyOn(ReservaService, "cancelarReserva");
             await expect(
-                ReservaRemotaService.cancelar("id", "RODRIGO", "ONLINE")
+                ReservaRemotaService.cancelar("id", "ONLINE")
             ).rejects.toThrow(`erro ${status}`);
             expect(obter).not.toHaveBeenCalled();
             expect(salvar).not.toHaveBeenCalled();
@@ -184,7 +183,7 @@ describe("reservas remotas", () => {
 
     test("offline bloqueia cancelamento", async () => {
         const post = jest.spyOn(ApiService, "cancelarReserva");
-        await expect(ReservaRemotaService.cancelar("id", "RODRIGO", "OFFLINE")).rejects.toThrow("offline");
+        await expect(ReservaRemotaService.cancelar("id", "OFFLINE")).rejects.toThrow("offline");
         expect(post).not.toHaveBeenCalled();
     });
 

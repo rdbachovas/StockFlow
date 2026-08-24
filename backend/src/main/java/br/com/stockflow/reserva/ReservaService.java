@@ -62,19 +62,22 @@ public class ReservaService {
 
     @Transactional
     public ReservaResponse criar(ReservaRequest request) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "CRIAR_RESERVA", ReservaResponse.class,
-                () -> criarNova(request), ReservaResponse::revisao
+                () -> criarNova(request, responsavelId), ReservaResponse::revisao
         );
     }
 
-    private ReservaResponse criarNova(ReservaRequest request) {
-        validarDestino(request.responsavelId(), request.destino());
+    private ReservaResponse criarNova(
+            ReservaRequest request,
+            String responsavelId
+    ) {
+        validarDestino(responsavelId, request.destino());
         validarProduto(request.produtoId(), request.destino());
 
         Estoque estoque = estoqueRepository
-                .findByResponsavelId(request.responsavelId())
+                .findByResponsavelId(responsavelId)
                 .orElseThrow(() -> new RegraReservaException(
                         "Responsável inválido."
                 ));
@@ -87,7 +90,7 @@ public class ReservaService {
         ));
 
         long reservado = reservaRepository.somarQuantidadeRestanteAtiva(
-                request.responsavelId(),
+                responsavelId,
                 request.produtoId()
         );
         long livre = item.getQuantidade() - reservado;
@@ -117,23 +120,23 @@ public class ReservaService {
             UUID id,
             CancelamentoReservaRequest request
     ) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "CANCELAR_RESERVA", ReservaResponse.class,
-                () -> cancelarNova(id, request), ReservaResponse::revisao
+                () -> cancelarNova(id, responsavelId), ReservaResponse::revisao
         );
     }
 
     private ReservaResponse cancelarNova(
             UUID id,
-            CancelamentoReservaRequest request
+            String responsavelId
     ) {
         Reserva reserva = reservaRepository.buscarParaCancelamento(id)
                 .orElseThrow(() -> new RegraReservaException(
                         "Reserva não encontrada."
                 ));
 
-        if (!reserva.getResponsavel().getId().equals(request.responsavelId())) {
+        if (!reserva.getResponsavel().getId().equals(responsavelId)) {
             throw new RegraReservaException(
                     "A reserva não pertence ao responsável informado."
             );

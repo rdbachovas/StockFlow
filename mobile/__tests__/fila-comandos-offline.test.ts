@@ -70,6 +70,8 @@ describe("fila offline persistente", () => {
         );
         expect(dados.estoquePrincipal.itens[0].quantidade).toBe(saldo);
         const conteudo = storage.setItem.mock.calls.at(-1)?.[1] ?? "";
+        expect(conteudo).toContain('"usuarioIdCriador":"RODRIGO"');
+        expect(conteudo).not.toContain('"responsavelId"');
         storage.getItem.mockResolvedValue(conteudo);
         FilaComandosService.reiniciarEstadoEmMemoria();
 
@@ -316,6 +318,35 @@ describe("fila offline persistente", () => {
         expect(comando.status).toBe("REQUER_ATENCAO");
         expect(comando.usuarioIdCriador).toBeUndefined();
         expect(post).not.toHaveBeenCalled();
+    });
+
+    test("migra fila antiga, preserva criador e commandId e remove identidade do payload", async () => {
+        storage.getItem.mockResolvedValue(JSON.stringify({
+            versao: 3,
+            comandos: [{
+                commandId: "cmd-legado",
+                tipo: "CANCELAR_RESERVA",
+                payload: {
+                    commandId: "cmd-legado",
+                    reservaId: "reserva-1",
+                    corpo: { responsavelId: "CESAR" }
+                },
+                dataCriacao: new Date().toISOString(),
+                status: "PENDENTE",
+                tentativas: 0
+            }]
+        }));
+
+        const comando = (await FilaComandosService.carregar())[0];
+
+        expect(comando).toMatchObject({
+            commandId: "cmd-legado",
+            usuarioIdCriador: "CESAR"
+        });
+        expect(JSON.stringify(comando.payload)).not.toContain("responsavelId");
+        const migrado = storage.setItem.mock.calls.at(-1)?.[1] ?? "";
+        expect(migrado).toContain('"versao":4');
+        expect(migrado).not.toContain('"responsavelId"');
     });
 
     test("fila persistida não contém tokens e logout não a remove", async () => {

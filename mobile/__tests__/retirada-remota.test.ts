@@ -71,7 +71,9 @@ describe("retirada remota", () => {
 
         await RetiradaRemotaService.registrar(retirada(), "ONLINE");
 
-        expect(post).toHaveBeenCalledWith(expect.objectContaining({ responsavelId: "RODRIGO" }));
+        expect(post).toHaveBeenCalledWith(expect.not.objectContaining({
+            responsavelId: expect.anything()
+        }));
     });
 
     test("retirada remota para Cesar envia a intenção correta", async () => {
@@ -82,7 +84,6 @@ describe("retirada remota", () => {
         await RetiradaRemotaService.registrar(retirada("CESAR"), "ONLINE");
 
         expect(post).toHaveBeenCalledWith(expect.objectContaining({
-            responsavelId: "CESAR",
             itens: [{ produtoId: ProdutoId.MIX, quantidade: 2 }]
         }));
     });

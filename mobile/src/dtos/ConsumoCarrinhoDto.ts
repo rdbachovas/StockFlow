@@ -5,7 +5,6 @@ export interface ItemConsumoCarrinhoRequestDto {
 
 export interface RegistrarConsumoCarrinhoRequestDto {
     commandId: string;
-    responsavelId: string;
     itens: ItemConsumoCarrinhoRequestDto[];
     data: string;
     observacao?: string;

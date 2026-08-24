@@ -13,7 +13,6 @@ export class AbastecimentoRemotoService {
             "abastecimento",
             (commandId) => ApiService.registrarAbastecimento({
                 commandId,
-                responsavelId: abastecimento.responsavelId,
                 local: abastecimento.localId,
                 itens: abastecimento.itens.map((item) => ({ ...item })),
                 data: abastecimento.data.toISOString(),

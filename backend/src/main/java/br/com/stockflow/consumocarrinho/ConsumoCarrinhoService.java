@@ -51,19 +51,23 @@ public class ConsumoCarrinhoService {
 
     @Transactional
     public ConsumoCarrinhoResponse registrar(ConsumoCarrinhoRequest request) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "CONSUMO_CARRINHO",
                 ConsumoCarrinhoResponse.class,
-                () -> registrarNovo(request), ConsumoCarrinhoResponse::revisao
+                () -> registrarNovo(request, responsavelId),
+                ConsumoCarrinhoResponse::revisao
         );
     }
 
-    private ConsumoCarrinhoResponse registrarNovo(ConsumoCarrinhoRequest request) {
+    private ConsumoCarrinhoResponse registrarNovo(
+            ConsumoCarrinhoRequest request,
+            String responsavelId
+    ) {
         Map<String, ConsumoCarrinhoRequest.Item> solicitados =
                 validarEIndexar(request.itens());
         Estoque pessoal = estoqueRepository
-                .findByResponsavelId(request.responsavelId())
+                .findByResponsavelId(responsavelId)
                 .orElseThrow(() -> new RegraConsumoCarrinhoException(
                         "Responsável inválido."
                 ));

@@ -11,7 +11,6 @@ export interface ItemDevolucaoRequestDto {
 
 export interface RegistrarDevolucaoRequestDto {
     commandId: string;
-    responsavelId: string;
     itens: ItemDevolucaoRequestDto[];
     data: string;
     observacao?: string;

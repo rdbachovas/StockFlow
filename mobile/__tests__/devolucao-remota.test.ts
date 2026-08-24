@@ -105,7 +105,6 @@ describe("devolução remota", () => {
         await DevolucaoRemotaService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarDevolucao).toHaveBeenCalledWith({
             commandId: expect.any(String),
-            responsavelId: entrada.responsavelId,
             itens: entrada.itens.map((item) => ({
                 produtoId: item.produtoId,
                 quantidadeLivre: item.quantidadeLivre,

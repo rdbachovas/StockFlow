@@ -280,7 +280,6 @@ export function AppProvider({
         exigirIdentidade(retirada.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("RETIRADA", {
-                responsavelId: retirada.responsavelId,
                 itens: retirada.itens.map(({ produtoId, quantidade }) => ({ produtoId, quantidade })),
                 data: retirada.data.toISOString(),
                 observacao: retirada.observacao
@@ -301,7 +300,6 @@ export function AppProvider({
         exigirIdentidade(abastecimento.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("ABASTECIMENTO", {
-                responsavelId: abastecimento.responsavelId,
                 local: abastecimento.localId,
                 itens: abastecimento.itens.map((item) => ({ ...item })),
                 data: abastecimento.data.toISOString(),
@@ -319,7 +317,6 @@ export function AppProvider({
         exigirIdentidade(reserva.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CRIAR_RESERVA", {
-                responsavelId: reserva.responsavelId,
                 destino: reserva.destinoId,
                 produtoId: reserva.produtoId,
                 quantidade: reserva.quantidade
@@ -338,13 +335,12 @@ export function AppProvider({
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CANCELAR_RESERVA", {
                 reservaId,
-                corpo: { responsavelId }
+                corpo: {}
             });
         }
         return ReservaRemotaService
             .cancelar(
                 reservaId,
-                responsavelId,
                 estadoSincronizacao,
                 setEstadoSincronizacao
             )
@@ -357,7 +353,6 @@ export function AppProvider({
         exigirIdentidade(devolucao.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("DEVOLUCAO", {
-                responsavelId: devolucao.responsavelId,
                 itens: devolucao.itens.map((item) => ({
                     produtoId: item.produtoId,
                     quantidadeLivre: item.quantidadeLivre,
@@ -400,7 +395,6 @@ export function AppProvider({
         exigirIdentidade(solicitacao.responsavelId);
         if (estadoSincronizacao === "OFFLINE") {
             return salvarOffline("CONSUMO_CARRINHO", {
-                responsavelId: solicitacao.responsavelId,
                 itens: solicitacao.itens.map((item) => ({ ...item })),
                 data: solicitacao.data.toISOString(),
                 observacao: solicitacao.observacao

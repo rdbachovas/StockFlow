@@ -13,7 +13,6 @@ import jakarta.validation.constraints.Size;
 
 public record AbastecimentoRequest(
         @NotNull UUID commandId,
-        @NotBlank String responsavelId,
         @NotNull LocalAbastecimento local,
         @NotEmpty List<@Valid Item> itens,
         @NotNull OffsetDateTime data,

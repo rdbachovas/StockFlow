@@ -52,17 +52,20 @@ public class DevolucaoService {
 
     @Transactional
     public DevolucaoResponse registrar(DevolucaoRequest request) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "DEVOLUCAO", DevolucaoResponse.class,
-                () -> registrarNova(request), DevolucaoResponse::revisao
+                () -> registrarNova(request, responsavelId), DevolucaoResponse::revisao
         );
     }
 
-    private DevolucaoResponse registrarNova(DevolucaoRequest request) {
+    private DevolucaoResponse registrarNova(
+            DevolucaoRequest request,
+            String responsavelId
+    ) {
         Map<String, ItemSolicitado> solicitados = validarEIndexar(request);
         Estoque pessoal = estoqueRepository
-                .findByResponsavelId(request.responsavelId())
+                .findByResponsavelId(responsavelId)
                 .orElseThrow(() -> new RegraDevolucaoException(
                         "Responsável inválido."
                 ));
@@ -85,7 +88,7 @@ public class DevolucaoService {
         );
         Map<String, List<Reserva>> reservasPorProduto = indexarReservas(
                 reservaRepository.buscarAtivasParaAbastecimento(
-                        request.responsavelId(),
+                        responsavelId,
                         solicitados.keySet()
                 )
         );

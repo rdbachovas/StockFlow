@@ -53,7 +53,10 @@ export class FilaComandosService {
     ): Promise<ComandoPendente> {
         await this.carregar();
         const commandId = gerarCommandId();
-        const payload = { ...payloadSemCommandId, commandId };
+        const payload = this.removerIdentidadeRemota({
+            ...payloadSemCommandId,
+            commandId
+        });
         const comando = {
             commandId,
             usuarioIdCriador,
@@ -62,7 +65,7 @@ export class FilaComandosService {
             dataCriacao: new Date().toISOString(),
             status: "PENDENTE",
             tentativas: 0
-        } as ComandoPendente;
+        } as unknown as ComandoPendente;
         this.comandos.push(comando);
         await this.persistir();
         return comando;
@@ -220,7 +223,10 @@ export class FilaComandosService {
             case "CANCELAR_RESERVA":
                 return ApiService.cancelarReserva(
                     comando.payload.reservaId,
-                    comando.payload.corpo
+                    {
+                        ...comando.payload.corpo,
+                        commandId: comando.commandId
+                    }
                 );
             case "ABASTECIMENTO":
                 return ApiService.registrarAbastecimento(comando.payload);
@@ -260,5 +266,22 @@ export class FilaComandosService {
     private static notificar(): void {
         const comandos = this.listar();
         this.ouvintes.forEach((ouvinte) => ouvinte(comandos));
+    }
+
+    private static removerIdentidadeRemota(
+        payload: Record<string, unknown>
+    ): Record<string, unknown> {
+        const { responsavelId: _responsavelId, ...semResponsavel } = payload;
+        if (
+            typeof semResponsavel.corpo !== "object" ||
+            semResponsavel.corpo === null
+        ) {
+            return semResponsavel;
+        }
+        const {
+            responsavelId: _responsavelIdCorpo,
+            ...corpoSemResponsavel
+        } = semResponsavel.corpo as Record<string, unknown>;
+        return { ...semResponsavel, corpo: corpoSemResponsavel };
     }
 }

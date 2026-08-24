@@ -84,7 +84,6 @@ describe("consumo remoto do carrinho", () => {
         await ConsumoCarrinhoRemotoService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarConsumoCarrinho).toHaveBeenCalledWith({
             commandId: expect.any(String),
-            responsavelId: entrada.responsavelId,
             itens: entrada.itens,
             data: "2026-08-18T15:00:00.000Z",
             observacao: "Evento de domingo"

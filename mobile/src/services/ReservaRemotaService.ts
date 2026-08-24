@@ -13,7 +13,6 @@ export class ReservaRemotaService {
             "reserva",
             (commandId) => ApiService.criarReserva({
                 commandId,
-                responsavelId: reserva.responsavelId,
                 destino: reserva.destinoId,
                 produtoId: reserva.produtoId,
                 quantidade: reserva.quantidade
@@ -25,7 +24,6 @@ export class ReservaRemotaService {
 
     static async cancelar(
         reservaId: string,
-        responsavelId: string,
         estadoSincronizacao: EstadoSincronizacao,
         atualizarEstado?: (estado: EstadoSincronizacao) => void
     ): Promise<ResultadoOperacaoConfirmada> {
@@ -33,7 +31,7 @@ export class ReservaRemotaService {
             "reserva",
             (commandId) => ApiService.cancelarReserva(
                 reservaId,
-                { commandId, responsavelId }
+                { commandId }
             ),
             estadoSincronizacao,
             atualizarEstado

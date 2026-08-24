@@ -83,7 +83,7 @@ describe("abastecimento remoto", () => {
         await AbastecimentoRemotoService.registrar(abastecimento(), "ONLINE");
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith({
             commandId: expect.any(String),
-            responsavelId: "RODRIGO", local: "BOULEVARD",
+            local: "BOULEVARD",
             itens: [{ maquinaId: "M1", produtoId: "MIX", quantidade: 4 }],
             data: "2026-08-17T12:00:00.000Z", observacao: "Reposição"
         });
@@ -98,7 +98,7 @@ describe("abastecimento remoto", () => {
         );
         await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
         expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith(
-            expect.objectContaining({ responsavelId: "CESAR", local: "AEROPORTO" })
+            expect.objectContaining({ local: "AEROPORTO" })
         );
     });
 
@@ -118,7 +118,6 @@ describe("abastecimento remoto", () => {
             await AbastecimentoRemotoService.registrar(entrada, "ONLINE");
             expect(ApiService.registrarAbastecimento).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    responsavelId,
                     local: "GAUCHO_VICENTE_FONTOURA"
                 })
             );

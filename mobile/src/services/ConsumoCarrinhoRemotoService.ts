@@ -13,7 +13,6 @@ export class ConsumoCarrinhoRemotoService {
             "consumo do carrinho",
             (commandId) => ApiService.registrarConsumoCarrinho({
                 commandId,
-                responsavelId: solicitacao.responsavelId,
                 itens: solicitacao.itens.map((item) => ({
                     produtoId: item.produtoId,
                     quantidade: item.quantidade

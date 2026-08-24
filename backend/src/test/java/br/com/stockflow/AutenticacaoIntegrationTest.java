@@ -176,32 +176,51 @@ class AutenticacaoIntegrationTest {
     }
 
     @Test
-    void usuariosNaoPodemAgirComoOutroResponsavel() throws Exception {
+    void retiradaDerivaResponsavelDoJwtSemCampoNoRequest() throws Exception {
         Tokens rodrigo = tokens("rodrigo", "senha-teste-rodrigo");
         Tokens cesar = tokens("cesar", "senha-teste-cesar");
-        retirada(rodrigo.accessToken(), "CESAR", UUID.randomUUID())
-                .andExpect(status().isForbidden());
-        retirada(cesar.accessToken(), "RODRIGO", UUID.randomUUID())
-                .andExpect(status().isForbidden());
+        retirada(rodrigo.accessToken(), UUID.randomUUID())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.responsavelId").value("RODRIGO"))
+                .andExpect(jsonPath("$.estoqueDestinoId").value("ESTOQUE_RODRIGO"));
+        retirada(cesar.accessToken(), UUID.randomUUID())
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.responsavelId").value("CESAR"))
+                .andExpect(jsonPath("$.estoqueDestinoId").value("ESTOQUE_CESAR"));
     }
 
     @Test
     void preservaDestinosPermitidos() throws Exception {
         Tokens rodrigo = tokens("rodrigo", "senha-teste-rodrigo");
         Tokens cesar = tokens("cesar", "senha-teste-cesar");
-        retirada(rodrigo.accessToken(), "RODRIGO", UUID.randomUUID())
+        retirada(rodrigo.accessToken(), UUID.randomUUID())
                 .andExpect(status().isCreated());
-        retirada(cesar.accessToken(), "CESAR", UUID.randomUUID())
+        retirada(cesar.accessToken(), UUID.randomUUID())
                 .andExpect(status().isCreated());
 
-        reserva(rodrigo.accessToken(), "RODRIGO", "BOULEVARD")
+        reserva(rodrigo.accessToken(), "BOULEVARD")
                 .andExpect(status().isCreated());
-        reserva(cesar.accessToken(), "CESAR", "AEROPORTO")
+        reserva(cesar.accessToken(), "AEROPORTO")
                 .andExpect(status().isCreated());
-        reserva(rodrigo.accessToken(), "RODRIGO", "MERCADOS")
+        reserva(rodrigo.accessToken(), "MERCADOS")
                 .andExpect(status().isCreated());
-        reserva(cesar.accessToken(), "CESAR", "MERCADOS")
+        reserva(cesar.accessToken(), "MERCADOS")
                 .andExpect(status().isCreated());
+        reserva(rodrigo.accessToken(), "AEROPORTO")
+                .andExpect(status().isBadRequest());
+        reserva(cesar.accessToken(), "BOULEVARD")
+                .andExpect(status().isBadRequest());
+
+        abastecimento(rodrigo.accessToken(), "AEROPORTO", "B06")
+                .andExpect(status().isBadRequest());
+        abastecimento(cesar.accessToken(), "BOULEVARD", "M1")
+                .andExpect(status().isBadRequest());
+        abastecimento(rodrigo.accessToken(), "GAUCHO_VICENTE_FONTOURA", "LOJA_1")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.responsavelId").value("RODRIGO"));
+        abastecimento(cesar.accessToken(), "GAUCHO_VICENTE_FONTOURA", "LOJA_1")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.responsavelId").value("CESAR"));
     }
 
     @Test
@@ -286,28 +305,28 @@ class AutenticacaoIntegrationTest {
     }
 
     private org.springframework.test.web.servlet.ResultActions retirada(
-            String token, String responsavel, UUID commandId
+            String token, UUID commandId
     ) throws Exception {
         return mockMvc.perform(post("/api/v1/retiradas")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"commandId":"%s","responsavelId":"%s","itens":[
+                        {"commandId":"%s","itens":[
                         {"produtoId":"MIX","quantidade":10}],
                         "data":"2026-08-22T10:00:00Z"}
-                        """.formatted(commandId, responsavel)));
+                        """.formatted(commandId)));
     }
 
     private org.springframework.test.web.servlet.ResultActions reserva(
-            String token, String responsavel, String destino
+            String token, String destino
     ) throws Exception {
         return mockMvc.perform(post("/api/v1/reservas")
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"commandId":"%s","responsavelId":"%s",
+                        {"commandId":"%s",
                         "destino":"%s","produtoId":"MIX","quantidade":1}
-                        """.formatted(UUID.randomUUID(), responsavel, destino)));
+                        """.formatted(UUID.randomUUID(), destino)));
     }
 
     private org.springframework.test.web.servlet.ResultActions movimento(
@@ -321,6 +340,21 @@ class AutenticacaoIntegrationTest {
                         {"produtoId":"MIX","quantidade":1}],
                         "data":"2026-08-22T11:00:00Z"}
                         """.formatted(commandId)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions abastecimento(
+            String token,
+            String local,
+            String maquinaId
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/abastecimentos")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"commandId":"%s","local":"%s","itens":[
+                        {"maquinaId":"%s","produtoId":"MIX","quantidade":1}],
+                        "data":"2026-08-22T12:00:00Z"}
+                        """.formatted(UUID.randomUUID(), local, maquinaId)));
     }
 
     private record Tokens(String accessToken, String refreshToken) {

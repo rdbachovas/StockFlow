@@ -1,6 +1,5 @@
 export interface RegistrarRetiradaRequestDto {
     commandId: string;
-    responsavelId: string;
     itens: Array<{
         produtoId: string;
         quantidade: number;

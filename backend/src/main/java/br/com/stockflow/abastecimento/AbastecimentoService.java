@@ -65,19 +65,22 @@ public class AbastecimentoService {
 
     @Transactional
     public AbastecimentoResponse registrar(AbastecimentoRequest request) {
-        identidadeAtual.exigirIgual(request.responsavelId());
+        String responsavelId = identidadeAtual.id();
         return idempotenciaService.executar(
                 request.commandId(), "ABASTECIMENTO", AbastecimentoResponse.class,
-                () -> registrarNovo(request), AbastecimentoResponse::revisao
+                () -> registrarNovo(request, responsavelId), AbastecimentoResponse::revisao
         );
     }
 
-    private AbastecimentoResponse registrarNovo(AbastecimentoRequest request) {
+    private AbastecimentoResponse registrarNovo(
+            AbastecimentoRequest request,
+            String responsavelId
+    ) {
         DestinoReserva destinoReserva = request.local().destinoReserva();
-        validarResponsavel(request.responsavelId(), destinoReserva);
+        validarResponsavel(responsavelId, destinoReserva);
 
         Estoque estoque = estoqueRepository
-                .findByResponsavelId(request.responsavelId())
+                .findByResponsavelId(responsavelId)
                 .orElseThrow(() -> new RegraAbastecimentoException(
                         "Responsável inválido."
                 ));
@@ -96,7 +99,7 @@ public class AbastecimentoService {
         );
         List<Reserva> reservas = reservaRepository
                 .buscarAtivasParaAbastecimento(
-                        request.responsavelId(),
+                        responsavelId,
                         quantidadePorProduto.keySet()
                 );
 

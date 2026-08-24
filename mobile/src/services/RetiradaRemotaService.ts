@@ -13,7 +13,6 @@ export class RetiradaRemotaService {
             "retirada",
             (commandId) => ApiService.registrarRetirada({
                 commandId,
-                responsavelId: retirada.responsavelId,
                 itens: retirada.itens.map((item) => ({
                     produtoId: item.produtoId,
                     quantidade: item.quantidade
