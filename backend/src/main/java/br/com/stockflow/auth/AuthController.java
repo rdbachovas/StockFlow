@@ -4,7 +4,11 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.Arrays;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,6 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(
+            AuthController.class
+    );
 
     private final AuthService authService;
     private final AuthCookieService cookieService;
@@ -54,7 +62,12 @@ public class AuthController {
     ) {
         transportSecurity.validarNative(httpRequest);
         rateLimiter.consumirRefresh(httpRequest.getRemoteAddr());
-        return authService.refresh(request.refreshToken());
+        AuthResponse response = authService.refresh(request.refreshToken());
+        LOGGER.info(
+                "sessão renovada requestId={} usuário={}",
+                MDC.get("requestId"), response.usuario().id()
+        );
+        return response;
     }
 
     @PostMapping("/logout")
@@ -66,6 +79,10 @@ public class AuthController {
     ) {
         transportSecurity.validarNative(httpRequest);
         authService.logout(request.refreshToken(), authentication.getName());
+        LOGGER.info(
+                "logout concluído requestId={} usuário={}",
+                MDC.get("requestId"), authentication.getName()
+        );
     }
 
     @PostMapping("/web/login")
@@ -83,7 +100,12 @@ public class AuthController {
     ) {
         transportSecurity.validarWeb(request);
         rateLimiter.consumirRefresh(request.getRemoteAddr());
-        return respostaWeb(authService.refresh(cookie(request)));
+        AuthResponse response = authService.refresh(cookie(request));
+        LOGGER.info(
+                "sessão web renovada requestId={} usuário={}",
+                MDC.get("requestId"), response.usuario().id()
+        );
+        return respostaWeb(response);
     }
 
     @PostMapping("/web/logout")
@@ -96,6 +118,10 @@ public class AuthController {
         if (refreshToken != null) {
             authService.logout(refreshToken, authentication.getName());
         }
+        LOGGER.info(
+                "logout web concluído requestId={} usuário={}",
+                MDC.get("requestId"), authentication.getName()
+        );
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookieService.expirar().toString())
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -123,6 +149,10 @@ public class AuthController {
         }
         authService.alterarSenha(
                 authentication.getName(), request.senhaAtual(), request.novaSenha()
+        );
+        LOGGER.info(
+                "senha alterada requestId={} usuário={}",
+                MDC.get("requestId"), authentication.getName()
         );
         ResponseEntity.HeadersBuilder<?> response = ResponseEntity.noContent()
                 .header(HttpHeaders.CACHE_CONTROL, "no-store");
@@ -156,9 +186,14 @@ public class AuthController {
                     request.login(), request.senha()
             );
             rateLimiter.registrarSucessoLogin(ip, request.login());
+            LOGGER.info(
+                    "login concluído requestId={} usuário={}",
+                    MDC.get("requestId"), response.usuario().id()
+            );
             return response;
         } catch (org.springframework.security.authentication.BadCredentialsException erro) {
             rateLimiter.registrarFalhaLogin(ip, request.login());
+            LOGGER.warn("login rejeitado requestId={}", MDC.get("requestId"));
             throw erro;
         }
     }
@@ -181,15 +216,18 @@ public class AuthController {
                 .orElse(null);
     }
 
-    public record LoginRequest(@NotBlank String login, @NotBlank String senha) {
+    public record LoginRequest(
+            @NotBlank @Size(max = 100) String login,
+            @NotBlank @Size(max = 128) String senha
+    ) {
     }
 
-    public record RefreshRequest(@NotBlank String refreshToken) {
+    public record RefreshRequest(@NotBlank @Size(max = 256) String refreshToken) {
     }
 
     public record ChangePasswordRequest(
-            @NotBlank String senhaAtual,
-            @NotBlank String novaSenha
+            @NotBlank @Size(max = 128) String senhaAtual,
+            @NotBlank @Size(max = 128) String novaSenha
     ) {
     }
 }

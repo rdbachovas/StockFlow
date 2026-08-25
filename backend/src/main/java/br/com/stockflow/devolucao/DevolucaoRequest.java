@@ -15,7 +15,7 @@ import jakarta.validation.constraints.Size;
 
 public record DevolucaoRequest(
         @NotNull UUID commandId,
-        @NotEmpty List<@Valid Item> itens,
+        @NotEmpty @Size(max = 50) List<@Valid Item> itens,
         @NotNull OffsetDateTime data,
         @Size(max = 500) String observacao
 ) {
@@ -24,9 +24,9 @@ public record DevolucaoRequest(
     }
 
     public record Item(
-            @NotBlank String produtoId,
+            @NotBlank @Size(max = 64) String produtoId,
             @Min(0) int quantidadeLivre,
-            @NotNull List<@Valid ParcelaReserva> reservas
+            @NotNull @Size(max = 10) List<@Valid ParcelaReserva> reservas
     ) {
     }
 

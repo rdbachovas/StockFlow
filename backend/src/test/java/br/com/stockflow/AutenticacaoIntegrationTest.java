@@ -87,6 +87,9 @@ class AutenticacaoIntegrationTest {
     void loginRodrigo() throws Exception {
         login("rodrigo", "senha-teste-rodrigo")
                 .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(jsonPath("$.accessToken").isString())
                 .andExpect(jsonPath("$.refreshToken").isString())
                 .andExpect(jsonPath("$.expiresIn").value(900))
@@ -102,13 +105,16 @@ class AutenticacaoIntegrationTest {
 
     @Test
     void senhaInvalidaEUsuarioInexistenteRetornamRespostaGenerica() throws Exception {
-        String senhaInvalida = login("rodrigo", "incorreta")
+        JsonNode senhaInvalida = objectMapper.readTree(login("rodrigo", "incorreta")
                 .andExpect(status().isUnauthorized())
-                .andReturn().getResponse().getContentAsString();
-        String inexistente = login("ninguem", "incorreta")
+                .andReturn().getResponse().getContentAsString());
+        JsonNode inexistente = objectMapper.readTree(login("ninguem", "incorreta")
                 .andExpect(status().isUnauthorized())
-                .andReturn().getResponse().getContentAsString();
-        assertThat(inexistente).isEqualTo(senhaInvalida);
+                .andReturn().getResponse().getContentAsString());
+        assertThat(inexistente.get("detail")).isEqualTo(senhaInvalida.get("detail"));
+        assertThat(inexistente.get("code")).isEqualTo(senhaInvalida.get("code"));
+        assertThat(inexistente.get("requestId").asText())
+                .isNotEqualTo(senhaInvalida.get("requestId").asText());
     }
 
     @Test
@@ -129,8 +135,12 @@ class AutenticacaoIntegrationTest {
         )).andExpect(status().isUnauthorized());
 
         String valido = tokens("rodrigo", "senha-teste-rodrigo").accessToken();
-        String adulterado = valido.substring(0, valido.length() - 1)
-                + (valido.endsWith("a") ? "b" : "a");
+        int inicioAssinatura = valido.lastIndexOf('.') + 1;
+        int indiceAdulterado = inicioAssinatura + 5;
+        char original = valido.charAt(indiceAdulterado);
+        String adulterado = valido.substring(0, indiceAdulterado)
+                + (original == 'a' ? "b" : "a")
+                + valido.substring(indiceAdulterado + 1);
         mockMvc.perform(get("/api/v1/snapshot").header(
                 "Authorization", "Bearer " + adulterado
         )).andExpect(status().isUnauthorized());
@@ -141,7 +151,9 @@ class AutenticacaoIntegrationTest {
         Tokens tokens = tokens("cesar", "senha-teste-cesar");
         mockMvc.perform(get("/api/v1/snapshot").header(
                 "Authorization", "Bearer " + tokens.accessToken()
-        )).andExpect(status().isOk());
+        )).andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(header().exists("X-Request-Id"));
         mockMvc.perform(get("/api/v1/auth/me").header(
                 "Authorization", "Bearer " + tokens.accessToken()
         )).andExpect(status().isOk())

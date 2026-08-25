@@ -108,6 +108,7 @@ class DatabaseIntegrationTest {
     void healthRetornaUp() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
+                .andExpect(header().exists("X-Request-Id"))
                 .andExpect(jsonPath("$.status").value("UP"));
         mockMvc.perform(get("/api/v1/health/readiness"))
                 .andExpect(status().isOk())

@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
+import br.com.stockflow.config.RequestCorrelationFilter;
 
 public class RequiredPasswordChangeFilter extends OncePerRequestFilter {
 
@@ -36,7 +37,9 @@ public class RequiredPasswordChangeFilter extends OncePerRequestFilter {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
             response.getWriter().write(
-                    "{\"status\":403,\"detail\":\"Troca de senha obrigatória.\"}"
+                    """
+                    {"status":403,"code":"PASSWORD_CHANGE_REQUIRED","detail":"Troca de senha obrigatória.","requestId":"%s"}
+                    """.formatted(RequestCorrelationFilter.current(request)).strip()
             );
             return;
         }

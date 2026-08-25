@@ -64,3 +64,17 @@ O cleanup remove apenas refresh sessions expiradas ou revogadas há mais de 30
 dias. Comandos idempotentes usam retenção conservadora de 90 dias, muito acima
 da janela normal de retry da fila offline. Ambos os prazos são configuráveis e
 o job é transacional, idempotente e executado por uma única tarefa local.
+
+## Hardening HTTP
+
+Toda resposta da API usa `Cache-Control: no-store`, recebe um
+`X-Request-Id` seguro e inclui headers contra MIME sniffing, framing e vazamento
+de referrer. Em HTTPS, HSTS é enviado com validade de um ano. Requests possuem
+limite padrão de 1 MiB, configurável por `HTTP_MAX_BODY_BYTES`; operações aceitam
+até 50 itens. O log de acesso omite health checks, headers e bodies e registra
+somente request ID, método, path, status e duração.
+
+O backend não serve os assets do Expo Web. A CSP deve ser definida no hosting
+estático depois que os domínios reais de scripts, fontes, imagens e conexões
+forem conhecidos. Não foi adicionada uma CSP genérica à API para evitar uma
+política ineficaz ou incompatível com o bundle Web.

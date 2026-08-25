@@ -46,8 +46,10 @@ public class CorsConfig {
         ));
         cors.setAllowedHeaders(List.of(
                 HttpHeaders.AUTHORIZATION,
-                HttpHeaders.CONTENT_TYPE
+                HttpHeaders.CONTENT_TYPE,
+                RequestCorrelationFilter.HEADER
         ));
+        cors.setExposedHeaders(List.of(RequestCorrelationFilter.HEADER));
         cors.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source =

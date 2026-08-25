@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
 
 public record ConsumoCarrinhoRequest(
         @NotNull UUID commandId,
-        @NotEmpty List<@Valid Item> itens,
+        @NotEmpty @Size(max = 50) List<@Valid Item> itens,
         @NotNull OffsetDateTime data,
         @Size(max = 500) String observacao
 ) {
@@ -22,7 +22,7 @@ public record ConsumoCarrinhoRequest(
     }
 
     public record Item(
-            @NotBlank String produtoId,
+            @NotBlank @Size(max = 64) String produtoId,
             @Positive int quantidade
     ) {
     }
