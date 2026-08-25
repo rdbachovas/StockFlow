@@ -32,6 +32,12 @@ public class Usuario {
     @Column(name = "atualizado_em", nullable = false)
     private OffsetDateTime atualizadoEm;
 
+    @Column(name = "senha_alterada_em")
+    private OffsetDateTime senhaAlteradaEm;
+
+    @Column(name = "troca_senha_obrigatoria", nullable = false)
+    private boolean trocaSenhaObrigatoria;
+
     protected Usuario() {
     }
 
@@ -46,9 +52,25 @@ public class Usuario {
     public String getLogin() { return login; }
     public String getSenhaHash() { return senhaHash; }
     public boolean isAtivo() { return ativo; }
+    public boolean isTrocaSenhaObrigatoria() { return trocaSenhaObrigatoria; }
 
     public void definirSenhaHash(String senhaHash, OffsetDateTime agora) {
         this.senhaHash = senhaHash;
         this.atualizadoEm = agora;
+    }
+
+    public void definirSenhaTemporaria(
+            String senhaHash,
+            OffsetDateTime agora,
+            boolean temporaria
+    ) {
+        definirSenhaHash(senhaHash, agora);
+        this.trocaSenhaObrigatoria = temporaria;
+    }
+
+    public void alterarSenha(String senhaHash, OffsetDateTime agora) {
+        definirSenhaHash(senhaHash, agora);
+        this.senhaAlteradaEm = agora;
+        this.trocaSenhaObrigatoria = false;
     }
 }

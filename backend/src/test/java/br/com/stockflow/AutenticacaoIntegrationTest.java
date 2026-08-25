@@ -24,6 +24,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -57,6 +58,7 @@ class AutenticacaoIntegrationTest {
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired JwtEncoder jwtEncoder;
     @Autowired TokenService tokenService;
+    @Autowired PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void preparar() {
@@ -71,6 +73,14 @@ class AutenticacaoIntegrationTest {
         jdbcTemplate.update("DELETE FROM estoque_itens WHERE estoque_id <> 'ESTOQUE_PRINCIPAL'");
         jdbcTemplate.update("UPDATE estoque_itens SET quantidade = CASE produto_id WHEN 'MIX' THEN 300 ELSE quantidade END WHERE estoque_id = 'ESTOQUE_PRINCIPAL'");
         jdbcTemplate.update("UPDATE usuarios SET ativo = TRUE");
+        jdbcTemplate.update(
+                "UPDATE usuarios SET senha_hash = ?, troca_senha_obrigatoria = FALSE WHERE id = 'RODRIGO'",
+                passwordEncoder.encode("senha-teste-rodrigo")
+        );
+        jdbcTemplate.update(
+                "UPDATE usuarios SET senha_hash = ?, troca_senha_obrigatoria = FALSE WHERE id = 'CESAR'",
+                passwordEncoder.encode("senha-teste-cesar")
+        );
     }
 
     @Test
@@ -275,6 +285,107 @@ class AutenticacaoIntegrationTest {
     }
 
     @Test
+    void senhaTemporariaBloqueiaOperacoesAteTrocaSegura() throws Exception {
+        jdbcTemplate.update("""
+                UPDATE usuarios SET troca_senha_obrigatoria = TRUE
+                WHERE id = 'RODRIGO'
+                """);
+        Tokens rodrigo = tokens("rodrigo", "senha-teste-rodrigo");
+
+        mockMvc.perform(get("/api/v1/auth/me").header(
+                "Authorization", "Bearer " + rodrigo.accessToken()
+        )).andExpect(status().isOk())
+                .andExpect(jsonPath("$.trocaSenhaObrigatoria").value(true));
+        mockMvc.perform(get("/api/v1/snapshot").header(
+                "Authorization", "Bearer " + rodrigo.accessToken()
+        )).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail")
+                        .value("Troca de senha obrigatória."));
+        refresh(rodrigo.refreshToken()).andExpect(status().isOk());
+
+        String hashAnterior = jdbcTemplate.queryForObject(
+                "SELECT senha_hash FROM usuarios WHERE id = 'RODRIGO'",
+                String.class
+        );
+        Tokens cesar = tokens("cesar", "senha-teste-cesar");
+        alterarSenha(
+                rodrigo.accessToken(),
+                "senha-teste-rodrigo",
+                "nova senha definitiva do Rodrigo"
+        ).andExpect(status().isNoContent());
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT senha_hash FROM usuarios WHERE id = 'RODRIGO'",
+                String.class
+        )).isNotEqualTo(hashAnterior);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT troca_senha_obrigatoria FROM usuarios WHERE id = 'RODRIGO'",
+                Boolean.class
+        )).isFalse();
+        login("rodrigo", "senha-teste-rodrigo").andExpect(status().isUnauthorized());
+        refresh(rodrigo.refreshToken()).andExpect(status().isUnauthorized());
+        refresh(cesar.refreshToken()).andExpect(status().isOk());
+
+        Tokens novo = tokens("rodrigo", "nova senha definitiva do Rodrigo");
+        mockMvc.perform(get("/api/v1/snapshot").header(
+                "Authorization", "Bearer " + novo.accessToken()
+        )).andExpect(status().isOk());
+    }
+
+    @Test
+    void trocaSenhaValidaSenhaAtualPoliticaEDiferenca() throws Exception {
+        Tokens tokens = tokens("cesar", "senha-teste-cesar");
+        alterarSenha(tokens.accessToken(), "incorreta", "nova senha longa 123")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Senha atual inválida."));
+        alterarSenha(tokens.accessToken(), "senha-teste-cesar", "curta")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", org.hamcrest.Matchers.containsString(
+                        "entre 12 e 128"
+                )));
+        alterarSenha(
+                tokens.accessToken(),
+                "senha-teste-cesar",
+                "senha-teste-cesar"
+        ).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", org.hamcrest.Matchers.containsString(
+                        "diferente"
+                )));
+    }
+
+    @Test
+    void loginRetorna429ComRetryAfterSemAfetarOutroIp() throws Exception {
+        Tokens autorizado = tokens("cesar", "senha-teste-cesar");
+        for (int tentativa = 0; tentativa < 5; tentativa++) {
+            loginDeIp("nao-existe", "incorreta", "198.51.100.10")
+                    .andExpect(status().isUnauthorized());
+        }
+        loginDeIp("nao-existe", "incorreta", "198.51.100.10")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER))
+                .andExpect(jsonPath("$.detail").value(
+                        "Muitas tentativas. Tente novamente mais tarde."
+                ));
+        loginDeIp("rodrigo", "senha-teste-rodrigo", "198.51.100.11")
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/snapshot")
+                        .with(request -> { request.setRemoteAddr("198.51.100.10"); return request; })
+                        .header("Authorization", "Bearer " + autorizado.accessToken()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void refreshPossuiLimiteHttpIndependente() throws Exception {
+        for (int tentativa = 0; tentativa < 30; tentativa++) {
+            refreshDeIp("invalido", "203.0.113.20")
+                    .andExpect(status().isUnauthorized());
+        }
+        refreshDeIp("invalido", "203.0.113.20")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists(HttpHeaders.RETRY_AFTER));
+    }
+
+    @Test
     void retiradaDerivaResponsavelDoJwtSemCampoNoRequest() throws Exception {
         Tokens rodrigo = tokens("rodrigo", "senha-teste-rodrigo");
         Tokens cesar = tokens("cesar", "senha-teste-cesar");
@@ -377,6 +488,32 @@ class AutenticacaoIntegrationTest {
                         """.formatted(login, senha)));
     }
 
+    private org.springframework.test.web.servlet.ResultActions loginDeIp(
+            String login,
+            String senha,
+            String ip
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/login")
+                .with(request -> { request.setRemoteAddr(ip); return request; })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"login":"%s","senha":"%s"}
+                        """.formatted(login, senha)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions alterarSenha(
+            String accessToken,
+            String senhaAtual,
+            String novaSenha
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/change-password")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"senhaAtual":"%s","novaSenha":"%s"}
+                        """.formatted(senhaAtual, novaSenha)));
+    }
+
     private org.springframework.test.web.servlet.ResultActions refreshWeb(
             String token
     ) throws Exception {
@@ -410,6 +547,16 @@ class AutenticacaoIntegrationTest {
     private org.springframework.test.web.servlet.ResultActions refresh(String token)
             throws Exception {
         return mockMvc.perform(post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(refreshJson(token)));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions refreshDeIp(
+            String token,
+            String ip
+    ) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/refresh")
+                .with(request -> { request.setRemoteAddr(ip); return request; })
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(refreshJson(token)));
     }

@@ -98,6 +98,27 @@ describe("autenticação mobile", () => {
         expect(asyncStorage.removeItem).not.toHaveBeenCalled();
     });
 
+    test("troca de senha Native usa Bearer e remove sessão do SecureStore", async () => {
+        await SessaoService.aplicar(auth());
+        jest.mocked(fetch).mockResolvedValueOnce(resposta(204));
+
+        await AuthService.alterarSenha(
+            "senha-teste-rodrigo",
+            "nova senha definitiva"
+        );
+
+        const [url, init] = jest.mocked(fetch).mock.calls[0];
+        expect(String(url)).toContain("/api/v1/auth/change-password");
+        expect(JSON.parse(String(init?.body))).toEqual({
+            senhaAtual: "senha-teste-rodrigo",
+            novaSenha: "nova senha definitiva"
+        });
+        expect((init?.headers as Headers).get("Authorization"))
+            .toBe("Bearer access-1");
+        expect(secureStore.deleteItemAsync).toHaveBeenCalled();
+        expect(asyncStorage.removeItem).not.toHaveBeenCalled();
+    });
+
     test("401 coordena um único refresh e repete cada request uma vez", async () => {
         await SessaoService.aplicar(auth());
         secureStore.getItemAsync.mockResolvedValue("refresh-1");

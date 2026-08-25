@@ -16,15 +16,18 @@ public class InicializadorSenhas implements ApplicationRunner {
     private final UsuarioRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final AuthProperties properties;
+    private final AuthOperationalProperties operationalProperties;
 
     public InicializadorSenhas(
             UsuarioRepository repository,
             PasswordEncoder passwordEncoder,
-            AuthProperties properties
+            AuthProperties properties,
+            AuthOperationalProperties operationalProperties
     ) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.properties = properties;
+        this.operationalProperties = operationalProperties;
     }
 
     @Override
@@ -46,8 +49,10 @@ public class InicializadorSenhas implements ApplicationRunner {
                     variavel + " é obrigatória enquanto o usuário não possui senha."
             );
         }
-        usuario.definirSenhaHash(
-                passwordEncoder.encode(senha), OffsetDateTime.now(ZoneOffset.UTC)
+        usuario.definirSenhaTemporaria(
+                passwordEncoder.encode(senha),
+                OffsetDateTime.now(ZoneOffset.UTC),
+                operationalProperties.initialPasswordTemporary()
         );
     }
 }

@@ -33,4 +33,34 @@ public class AuthExceptionHandler {
         detalhe.setDetail("Credenciais ou sessão inválidas.");
         return detalhe;
     }
+
+    @ExceptionHandler(CurrentPasswordInvalidException.class)
+    public ProblemDetail senhaAtualInvalida() {
+        ProblemDetail detalhe = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        detalhe.setDetail("Senha atual inválida.");
+        return detalhe;
+    }
+
+    @ExceptionHandler(PasswordPolicyException.class)
+    public ProblemDetail politicaSenha(PasswordPolicyException exception) {
+        ProblemDetail detalhe = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        detalhe.setDetail(exception.getMessage());
+        return detalhe;
+    }
+
+    @ExceptionHandler(RateLimitException.class)
+    public ProblemDetail limite(
+            RateLimitException exception,
+            HttpServletResponse response
+    ) {
+        response.setHeader(
+                HttpHeaders.RETRY_AFTER,
+                Long.toString(exception.getRetryAfterSeconds())
+        );
+        ProblemDetail detalhe = ProblemDetail.forStatus(
+                HttpStatus.TOO_MANY_REQUESTS
+        );
+        detalhe.setDetail("Muitas tentativas. Tente novamente mais tarde.");
+        return detalhe;
+    }
 }

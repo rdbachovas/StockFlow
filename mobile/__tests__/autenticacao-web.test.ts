@@ -117,6 +117,22 @@ describe("autenticação Web por cookie HttpOnly", () => {
         expect(secureStore.deleteItemAsync).not.toHaveBeenCalled();
     });
 
+    test("troca de senha Web inclui cookie e não persiste token via JS", async () => {
+        jest.mocked(fetch)
+            .mockResolvedValueOnce(resposta(200, authWeb()))
+            .mockResolvedValueOnce(resposta(204));
+        await AuthService.login("rodrigo", "senha");
+
+        await AuthService.alterarSenha("senha", "nova senha definitiva");
+
+        const [url, init] = jest.mocked(fetch).mock.calls[1];
+        expect(String(url)).toContain("/api/v1/auth/change-password");
+        expect(init?.credentials).toBe("include");
+        expect(SessaoService.obterAccessToken()).toBeUndefined();
+        expect(secureStore.setItemAsync).not.toHaveBeenCalled();
+        expect(asyncStorage.removeItem).not.toHaveBeenCalled();
+    });
+
     test("requests comuns continuam usando somente Bearer", async () => {
         jest.mocked(fetch)
             .mockResolvedValueOnce(resposta(200, authWeb()))

@@ -2,8 +2,13 @@ package br.com.stockflow.config;
 
 import br.com.stockflow.auth.AuthProperties;
 import br.com.stockflow.auth.AuthCookieProperties;
+import br.com.stockflow.auth.AuthOperationalProperties;
+import br.com.stockflow.idempotencia.IdempotencyProperties;
+import br.com.stockflow.auth.RequiredPasswordChangeFilter;
+import br.com.stockflow.usuario.UsuarioRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -21,13 +26,22 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 @Configuration
-@EnableConfigurationProperties({AuthProperties.class, AuthCookieProperties.class})
+@EnableConfigurationProperties({
+        AuthProperties.class,
+        AuthCookieProperties.class,
+        AuthOperationalProperties.class,
+        IdempotencyProperties.class
+})
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            RequiredPasswordChangeFilter passwordChangeFilter
+    ) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
@@ -44,6 +58,10 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+                .addFilterAfter(
+                        passwordChangeFilter,
+                        BearerTokenAuthenticationFilter.class
+                )
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
                                 response.sendError(HttpStatus.UNAUTHORIZED.value()))
@@ -53,8 +71,20 @@ public class SecurityConfig {
     }
 
     @Bean
+    RequiredPasswordChangeFilter requiredPasswordChangeFilter(
+            UsuarioRepository usuarioRepository
+    ) {
+        return new RequiredPasswordChangeFilter(usuarioRepository);
+    }
+
+    @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
+    }
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
     }
 
     @Bean

@@ -24,15 +24,18 @@ public class AuthController {
     private final AuthService authService;
     private final AuthCookieService cookieService;
     private final AuthTransportSecurity transportSecurity;
+    private final AuthRateLimiter rateLimiter;
 
     public AuthController(
             AuthService authService,
             AuthCookieService cookieService,
-            AuthTransportSecurity transportSecurity
+            AuthTransportSecurity transportSecurity,
+            AuthRateLimiter rateLimiter
     ) {
         this.authService = authService;
         this.cookieService = cookieService;
         this.transportSecurity = transportSecurity;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
@@ -41,7 +44,7 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         transportSecurity.validarNative(httpRequest);
-        return authService.login(request.login(), request.senha());
+        return loginLimitado(request, httpRequest);
     }
 
     @PostMapping("/refresh")
@@ -50,6 +53,7 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         transportSecurity.validarNative(httpRequest);
+        rateLimiter.consumirRefresh(httpRequest.getRemoteAddr());
         return authService.refresh(request.refreshToken());
     }
 
@@ -70,7 +74,7 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         transportSecurity.validarWeb(httpRequest);
-        return respostaWeb(authService.login(request.login(), request.senha()));
+        return respostaWeb(loginLimitado(request, httpRequest));
     }
 
     @PostMapping("/web/refresh")
@@ -78,6 +82,7 @@ public class AuthController {
             HttpServletRequest request
     ) {
         transportSecurity.validarWeb(request);
+        rateLimiter.consumirRefresh(request.getRemoteAddr());
         return respostaWeb(authService.refresh(cookie(request)));
     }
 
@@ -106,6 +111,30 @@ public class AuthController {
                 ));
     }
 
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> alterarSenha(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication,
+            HttpServletRequest httpRequest
+    ) {
+        boolean web = httpRequest.getHeader("Origin") != null;
+        if (web) {
+            transportSecurity.validarWeb(httpRequest);
+        }
+        authService.alterarSenha(
+                authentication.getName(), request.senhaAtual(), request.novaSenha()
+        );
+        ResponseEntity.HeadersBuilder<?> response = ResponseEntity.noContent()
+                .header(HttpHeaders.CACHE_CONTROL, "no-store");
+        if (web) {
+            response.header(
+                    HttpHeaders.SET_COOKIE,
+                    cookieService.expirar().toString()
+            );
+        }
+        return response.build();
+    }
+
     private ResponseEntity<WebAuthResponse> respostaWeb(AuthResponse response) {
         return ResponseEntity.ok()
                 .header(
@@ -114,6 +143,24 @@ public class AuthController {
                 )
                 .cacheControl(CacheControl.noStore())
                 .body(WebAuthResponse.de(response));
+    }
+
+    private AuthResponse loginLimitado(
+            LoginRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        String ip = httpRequest.getRemoteAddr();
+        rateLimiter.verificarLogin(ip, request.login());
+        try {
+            AuthResponse response = authService.login(
+                    request.login(), request.senha()
+            );
+            rateLimiter.registrarSucessoLogin(ip, request.login());
+            return response;
+        } catch (org.springframework.security.authentication.BadCredentialsException erro) {
+            rateLimiter.registrarFalhaLogin(ip, request.login());
+            throw erro;
+        }
     }
 
     private String cookie(HttpServletRequest request) {
@@ -138,5 +185,11 @@ public class AuthController {
     }
 
     public record RefreshRequest(@NotBlank String refreshToken) {
+    }
+
+    public record ChangePasswordRequest(
+            @NotBlank String senhaAtual,
+            @NotBlank String novaSenha
+    ) {
     }
 }

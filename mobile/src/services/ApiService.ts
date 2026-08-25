@@ -1,4 +1,8 @@
-import { AuthResponseDto, LoginRequestDto } from "../dtos/AuthDto";
+import {
+    AuthResponseDto,
+    ChangePasswordRequestDto,
+    LoginRequestDto
+} from "../dtos/AuthDto";
 import { RegistrarAbastecimentoRequestDto, RegistrarAbastecimentoResponseDto } from "../dtos/AbastecimentoDto";
 import { RegistrarConsumoCarrinhoRequestDto, RegistrarConsumoCarrinhoResponseDto } from "../dtos/ConsumoCarrinhoDto";
 import { RegistrarDevolucaoRequestDto, RegistrarDevolucaoResponseDto } from "../dtos/DevolucaoDto";
@@ -144,6 +148,11 @@ export class ApiService {
 
     static async logout(): Promise<void> {
         const requisicao = await refreshSessionAdapter.logout();
+        return await this.semConteudo(requisicao.caminho, requisicao.init);
+    }
+
+    static async alterarSenha(request: ChangePasswordRequestDto): Promise<void> {
+        const requisicao = await refreshSessionAdapter.changePassword(request);
         return await this.semConteudo(requisicao.caminho, requisicao.init);
     }
 

@@ -11,6 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import br.com.stockflow.estoque.EstoqueRepository;
 import br.com.stockflow.produto.ProdutoRepository;
 import br.com.stockflow.usuario.UsuarioRepository;
+import br.com.stockflow.config.SecurityRetentionCleanup;
+import java.util.UUID;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -58,6 +62,9 @@ class DatabaseIntegrationTest {
     @Autowired
     MockMvc mockMvc;
 
+    @Autowired
+    SecurityRetentionCleanup retentionCleanup;
+
     @Test
     void migrationsCriamEstruturaESeed() {
         assertThat(usuarioRepository.count()).isEqualTo(2);
@@ -74,7 +81,7 @@ class DatabaseIntegrationTest {
         );
 
         assertThat(itensDoPrincipal).isEqualTo(12);
-        assertThat(migrations).isEqualTo(14);
+        assertThat(migrations).isEqualTo(15);
     }
 
     @Test
@@ -200,5 +207,55 @@ class DatabaseIntegrationTest {
                 .andExpect(jsonPath("$[1].id").value("ESTOQUE_PRINCIPAL"))
                 .andExpect(jsonPath("$[1].itens.length()").value(12))
                 .andExpect(jsonPath("$[2].id").value("ESTOQUE_RODRIGO"));
+    }
+
+    @Test
+    void retencaoRemoveSomenteSessoesEComandosAntigosElegiveis() {
+        UUID ativa = inserirSessao("a", 120, null);
+        UUID revogadaRecente = inserirSessao("b", 120, 1);
+        UUID revogadaAntiga = inserirSessao("c", 120, 40);
+        UUID expiradaAntiga = inserirSessao("d", -40, null);
+        UUID comandoRecente = inserirComando("1 day");
+        UUID comandoAntigo = inserirComando("100 days");
+
+        retentionCleanup.executar();
+
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT id FROM sessoes_refresh", UUID.class
+        )).contains(ativa, revogadaRecente)
+                .doesNotContain(revogadaAntiga, expiradaAntiga);
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT command_id FROM comandos_processados", UUID.class
+        )).contains(comandoRecente).doesNotContain(comandoAntigo);
+    }
+
+    private UUID inserirSessao(
+            String token,
+            int diasExpiracao,
+            Integer diasRevogacao
+    ) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO sessoes_refresh (
+                    id, usuario_id, token_hash, criado_em, expira_em, revogado_em
+                ) VALUES (?, 'RODRIGO', ?, ?, ?, ?)
+                """, id, token.repeat(64),
+                OffsetDateTime.now(ZoneOffset.UTC).minusDays(120),
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(diasExpiracao),
+                diasRevogacao == null ? null
+                        : OffsetDateTime.now(ZoneOffset.UTC).minusDays(diasRevogacao));
+        return id;
+    }
+
+    private UUID inserirComando(String idade) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update("""
+                INSERT INTO comandos_processados (
+                    command_id, tipo_operacao, revisao, resposta_json,
+                    data_processamento, usuario_id
+                ) VALUES (?, 'TESTE_RETENCAO', 1, '{}',
+                    CURRENT_TIMESTAMP - (?::interval), 'RODRIGO')
+                """, id, idade);
+        return id;
     }
 }

@@ -49,4 +49,12 @@ export class AuthService {
             await SessaoService.encerrar();
         }
     }
+
+    static async alterarSenha(
+        senhaAtual: string,
+        novaSenha: string
+    ): Promise<void> {
+        await ApiService.alterarSenha({ senhaAtual, novaSenha });
+        await SessaoService.encerrar();
+    }
 }

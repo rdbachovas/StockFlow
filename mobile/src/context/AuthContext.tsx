@@ -12,6 +12,7 @@ import { SessaoService } from "../services/SessaoService";
 
 export type EstadoAutenticacao =
     | "CARREGANDO"
+    | "TROCA_SENHA_OBRIGATORIA"
     | "AUTENTICADO"
     | "NAO_AUTENTICADO";
 
@@ -20,6 +21,7 @@ interface AuthContextValue {
     usuario?: SessaoUsuario;
     login: (login: string, senha: string) => Promise<void>;
     logout: () => Promise<void>;
+    alterarSenha: (senhaAtual: string, novaSenha: string) => Promise<void>;
     restaurarSessao: () => Promise<void>;
 }
 
@@ -34,7 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const restaurado = await AuthService.restaurarSessao();
             setUsuario(restaurado);
-            setEstado(restaurado ? "AUTENTICADO" : "NAO_AUTENTICADO");
+            setEstado(restaurado
+                ? estadoDoUsuario(restaurado)
+                : "NAO_AUTENTICADO");
         } catch (erro) {
             setUsuario(undefined);
             setEstado("NAO_AUTENTICADO");
@@ -54,11 +58,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const login = async (identificador: string, senha: string): Promise<void> => {
         const autenticado = await AuthService.login(identificador, senha);
         setUsuario(autenticado);
-        setEstado("AUTENTICADO");
+        setEstado(estadoDoUsuario(autenticado));
     };
 
     const logout = async (): Promise<void> => {
         await AuthService.logout();
+        setUsuario(undefined);
+        setEstado("NAO_AUTENTICADO");
+    };
+
+    const alterarSenha = async (
+        senhaAtual: string,
+        novaSenha: string
+    ): Promise<void> => {
+        await AuthService.alterarSenha(senhaAtual, novaSenha);
         setUsuario(undefined);
         setEstado("NAO_AUTENTICADO");
     };
@@ -69,11 +82,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             usuario,
             login,
             logout,
+            alterarSenha,
             restaurarSessao
         }}>
             {children}
         </AuthContext.Provider>
     );
+}
+
+export function estadoDoUsuario(usuario: SessaoUsuario): EstadoAutenticacao {
+    return usuario.trocaSenhaObrigatoria
+        ? "TROCA_SENHA_OBRIGATORIA"
+        : "AUTENTICADO";
+}
+
+export function podeInicializarOperacoes(
+    estado: EstadoAutenticacao
+): boolean {
+    return estado === "AUTENTICADO";
 }
 
 export function useAuth(): AuthContextValue {

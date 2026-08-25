@@ -1,4 +1,4 @@
-import { LoginRequestDto } from "../dtos/AuthDto";
+import { ChangePasswordRequestDto, LoginRequestDto } from "../dtos/AuthDto";
 import {
     postJson,
     RefreshSessionAdapter
@@ -28,6 +28,13 @@ export const refreshSessionAdapter: RefreshSessionAdapter = {
         return {
             caminho: "/api/v1/auth/web/logout",
             init: incluirCookie({ method: "POST" })
+        };
+    },
+
+    async changePassword(request: ChangePasswordRequestDto) {
+        return {
+            caminho: "/api/v1/auth/change-password",
+            init: incluirCookie(postJson(request))
         };
     },
 

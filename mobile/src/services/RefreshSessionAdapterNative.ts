@@ -1,4 +1,8 @@
-import { AuthResponseDto, LoginRequestDto } from "../dtos/AuthDto";
+import {
+    AuthResponseDto,
+    ChangePasswordRequestDto,
+    LoginRequestDto
+} from "../dtos/AuthDto";
 import { TokenStorageService } from "./TokenStorageService";
 import {
     postJson,
@@ -23,6 +27,13 @@ export const refreshSessionAdapterNative: RefreshSessionAdapter = {
         return {
             caminho: "/api/v1/auth/logout",
             init: postJson({ refreshToken: refreshToken ?? "" })
+        };
+    },
+
+    async changePassword(request: ChangePasswordRequestDto) {
+        return {
+            caminho: "/api/v1/auth/change-password",
+            init: postJson(request)
         };
     },
 

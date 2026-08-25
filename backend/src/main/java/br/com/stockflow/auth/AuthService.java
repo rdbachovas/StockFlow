@@ -20,19 +20,22 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final AuthProperties properties;
+    private final AuthOperationalProperties operationalProperties;
 
     public AuthService(
             UsuarioRepository usuarioRepository,
             SessaoRefreshRepository sessaoRepository,
             PasswordEncoder passwordEncoder,
             TokenService tokenService,
-            AuthProperties properties
+            AuthProperties properties,
+            AuthOperationalProperties operationalProperties
     ) {
         this.usuarioRepository = usuarioRepository;
         this.sessaoRepository = sessaoRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.properties = properties;
+        this.operationalProperties = operationalProperties;
     }
 
     @Transactional
@@ -84,6 +87,46 @@ public class AuthService {
         return usuarioRepository.findById(id)
                 .filter(Usuario::isAtivo)
                 .orElseThrow(() -> new BadCredentialsException("Sessão inválida."));
+    }
+
+    @Transactional
+    public void alterarSenha(
+            String usuarioId,
+            String senhaAtual,
+            String novaSenha
+    ) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .filter(Usuario::isAtivo)
+                .orElseThrow(CurrentPasswordInvalidException::new);
+        if (!passwordEncoder.matches(
+                senhaAtual == null ? "" : senhaAtual,
+                usuario.getSenhaHash()
+        )) {
+            throw new CurrentPasswordInvalidException();
+        }
+        validarNovaSenha(novaSenha);
+        if (passwordEncoder.matches(novaSenha, usuario.getSenhaHash())) {
+            throw new PasswordPolicyException(
+                    "A nova senha deve ser diferente da senha atual."
+            );
+        }
+        OffsetDateTime agora = OffsetDateTime.now(ZoneOffset.UTC);
+        usuario.alterarSenha(passwordEncoder.encode(novaSenha), agora);
+        sessaoRepository.revogarTodasDoUsuario(usuarioId, agora);
+    }
+
+    private void validarNovaSenha(String senha) {
+        if (senha == null || senha.isBlank()
+                || senha.length() < operationalProperties.passwordMinLength()
+                || senha.length() > operationalProperties.passwordMaxLength()) {
+            throw new PasswordPolicyException(
+                    "A nova senha deve ter entre %d e %d caracteres."
+                            .formatted(
+                                    operationalProperties.passwordMinLength(),
+                                    operationalProperties.passwordMaxLength()
+                            )
+            );
+        }
     }
 
     private AuthResponse criarSessao(Usuario usuario) {

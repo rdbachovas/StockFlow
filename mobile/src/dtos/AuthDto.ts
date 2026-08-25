@@ -11,3 +11,8 @@ export interface LoginRequestDto {
     login: string;
     senha: string;
 }
+
+export interface ChangePasswordRequestDto {
+    senhaAtual: string;
+    novaSenha: string;
+}

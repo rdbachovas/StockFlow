@@ -7,7 +7,11 @@ import {
 import {
     AppProvider
 } from "../context/AppContext";
-import { AuthProvider, useAuth } from "../context/AuthContext";
+import {
+    AuthProvider,
+    podeInicializarOperacoes,
+    useAuth
+} from "../context/AuthContext";
 
 export default function RootLayout() {
 
@@ -31,6 +35,21 @@ function AuthenticatedLayout() {
                 <Stack.Screen name="login" options={{ headerShown: false }} />
             </Stack>
         );
+    }
+
+    if (estado === "TROCA_SENHA_OBRIGATORIA") {
+        return (
+            <Stack>
+                <Stack.Screen
+                    name="change-password"
+                    options={{ title: "Trocar senha" }}
+                />
+            </Stack>
+        );
+    }
+
+    if (!podeInicializarOperacoes(estado)) {
+        return null;
     }
 
     return (

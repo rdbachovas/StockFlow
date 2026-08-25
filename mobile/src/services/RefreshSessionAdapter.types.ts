@@ -1,4 +1,8 @@
-import { AuthResponseDto, LoginRequestDto } from "../dtos/AuthDto";
+import {
+    AuthResponseDto,
+    ChangePasswordRequestDto,
+    LoginRequestDto
+} from "../dtos/AuthDto";
 
 export interface RequisicaoAuth {
     caminho: string;
@@ -9,6 +13,7 @@ export interface RefreshSessionAdapter {
     login(request: LoginRequestDto): Promise<RequisicaoAuth>;
     refresh(): Promise<RequisicaoAuth>;
     logout(): Promise<RequisicaoAuth>;
+    changePassword(request: ChangePasswordRequestDto): Promise<RequisicaoAuth>;
     podeRestaurar(): Promise<boolean>;
     aplicarResposta(auth: AuthResponseDto): Promise<void>;
     limparSessao(): Promise<void>;

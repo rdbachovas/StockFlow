@@ -6,6 +6,8 @@ stockflow:
     initial-passwords:
       rodrigo: "senha-teste-rodrigo"
       cesar: "senha-teste-cesar"
+    operational:
+      initial-password-temporary: false
   cors:
     allowed-origins: "https://web.stockflow.test"
     allow-credentials: true
