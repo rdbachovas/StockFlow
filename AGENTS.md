@@ -159,5 +159,80 @@ Não implementar backend, Spring Boot ou PostgreSQL ainda.
 
 ## Git
 
-Não fazer commit ou push sem pedido explícito.
-Não sobrescrever alterações não relacionadas.
+Para toda implementação solicitada que estiver concluída e completamente validada,
+seguir automaticamente o fluxo:
+
+IMPLEMENTAR → VALIDAR → REVISAR DIFF → COMMIT AUTOMÁTICO → PUSH AUTOMÁTICO
+
+Esta política substitui qualquer instrução anterior de não fazer commit ou push sem
+autorização explícita.
+
+### Antes de começar
+
+- Executar `git status`.
+- Identificar alterações pré-existentes.
+- Não sobrescrever nem incluir mudanças não relacionadas à tarefa.
+
+### Depois de implementar
+
+- Executar todos os testes e validações relevantes.
+- Executar `git diff --check`.
+- Revisar `git status` e `git diff`.
+- Confirmar que somente arquivos relacionados à tarefa serão incluídos.
+
+### Se tudo passar
+
+- Executar `git add` somente nos arquivos relacionados; não usar `git add .`
+  indiscriminadamente quando houver outros arquivos modificados.
+- Criar automaticamente um commit com mensagem curta e descritiva, usando um dos
+  prefixos: `feat:`, `fix:`, `refactor:`, `chore:` ou `test:`.
+- Fazer push automaticamente para o branch remoto atual.
+- Se o branch não tiver upstream, executar `git push -u origin <branch-atual>`.
+- Se o branch já tiver upstream, executar `git push` normalmente.
+- Se não houver mudança real, não criar commit vazio nem fazer push desnecessário.
+
+### Se alguma validação falhar
+
+- Não fazer commit nem push.
+- Corrigir a falha e validar novamente.
+- Fazer commit e push somente quando tudo estiver verde.
+
+### Alterações não relacionadas
+
+- Nunca incluir mudanças antigas ou não relacionadas.
+- Preservar essas mudanças fora do commit.
+- Não sobrescrever trabalho existente.
+
+### Operações proibidas
+
+- `git reset --hard`.
+- `git clean -fd`.
+- Force push, incluindo `git push --force`.
+- Rebase destrutivo.
+- Apagar stash.
+- Sobrescrever trabalho existente local ou remoto.
+
+### Conflito de push
+
+Se o remoto tiver avançado:
+
+- Não forçar o push.
+- Executar `git fetch`.
+- Analisar a divergência e integrar de forma segura.
+- Reexecutar as validações necessárias.
+- Fazer push somente depois que tudo estiver validado.
+
+Nunca sobrescrever diretamente trabalho remoto.
+
+### Relatório final de cada tarefa
+
+Informar:
+
+- Testes e validações executados.
+- Resultado das validações.
+- Principais arquivos alterados.
+- Hash e mensagem do commit.
+- Branch.
+- Resultado do push.
+- `git status` final.
+- Alterações não relacionadas que ficaram fora do commit.
