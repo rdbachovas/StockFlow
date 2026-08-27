@@ -1,5 +1,59 @@
 # Backend StockFlow
 
+## Container local
+
+A imagem usa Maven/JDK 21 apenas no estágio de build e Eclipse Temurin JRE 21
+Alpine no runtime. O processo roda sem privilégios com UID/GID `10001`. O valor
+default de `JAVA_TOOL_OPTIONS` limita o heap a 75% da memória disponível e pode
+ser substituído no ambiente conforme o limite do provedor.
+
+Build e execução direta, usando somente `backend/` como contexto:
+
+```bash
+cd backend
+docker build --tag stockflow-backend:local .
+docker run --rm --name stockflow-backend --publish 8080:8080 \
+  --env SPRING_PROFILES_ACTIVE=prod \
+  --env DB_URL=jdbc:postgresql://host.docker.internal:5432/stockflow \
+  --env DB_USERNAME=stockflow \
+  --env DB_PASSWORD=valor-local \
+  --env AUTH_JWT_SECRET=segredo-local-com-pelo-menos-32-bytes \
+  --env AUTH_INITIAL_PASSWORD_RODRIGO='RodrigoLocal123!' \
+  --env AUTH_INITIAL_PASSWORD_CESAR='CesarLocal123!' \
+  --env CORS_ALLOWED_ORIGINS=http://localhost:19006 \
+  stockflow-backend:local
+```
+
+`SPRING_PROFILES_ACTIVE`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`,
+`AUTH_JWT_SECRET` e `CORS_ALLOWED_ORIGINS` devem ser fornecidas externamente em
+produção. `PORT` é opcional e tem default `8080`. Configurações existentes de
+cookie, pool, rate limiting, retenção e limites HTTP continuam disponíveis por
+variáveis de ambiente; nenhum segredo é embutido na imagem. Em um banco novo,
+`AUTH_INITIAL_PASSWORD_RODRIGO` e `AUTH_INITIAL_PASSWORD_CESAR` também são
+necessárias no primeiro startup e devem ser fornecidas pelo ambiente.
+
+O ambiente local completo usa credenciais exclusivamente locais/de teste:
+
+```bash
+docker compose up --build --detach
+docker compose logs --follow backend
+docker compose restart backend
+docker compose down
+docker compose down --volumes --remove-orphans
+```
+
+O último comando remove também o banco local persistido. O backend aguarda o
+healthcheck do PostgreSQL, inicia o Spring Boot e deixa o próprio Flyway aplicar
+as migrations. Não existe script de migrations separado.
+
+Health checks:
+
+```bash
+curl http://localhost:8080/api/v1/health
+curl http://localhost:8080/api/v1/health/readiness
+curl http://localhost:8080/api/v1/health/liveness
+```
+
 ## Transporte da sessão
 
 O access token permanece no corpo da resposta e é usado como Bearer token em
