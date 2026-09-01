@@ -20,12 +20,15 @@ Use TypeScript, 4 espaços, aspas duplas e nomes do domínio em português.
 
 Fluxo atual:
 
-Screens → AppContext → Services
+Screens → AuthContext/AppContext → Services/Coordinator → API Spring Boot
+→ Services de domínio → JPA/transações → PostgreSQL
 
-Services contêm regras e validações.
-Não colocar AsyncStorage, HTTP ou UI dentro dos Services.
+Services de domínio contêm regras e validações e não recebem AsyncStorage, HTTP
+ou UI. Integrações ficam nos services dedicados de API, persistência,
+sincronização e adapters de plataforma.
 
-AppContext é a fonte reativa de estado.
+AppContext é a fonte reativa no cliente. PostgreSQL, acessado pelo backend, é a
+fonte oficial; AsyncStorage mantém cache e fila offline.
 
 ## Estoques
 
@@ -125,37 +128,60 @@ Nunca cancelar reservas arbitrariamente.
 
 ## Testes
 
-Baseline atual: 54 testes passando.
+Antes de concluir alterações, execute as validações relevantes. Quando a tarefa
+afetar o sistema completo, execute:
 
-Antes de concluir alterações:
-
-cd mobile
+```bash
+cd backend
+mvn test
+cd ../mobile
 npx tsc --noEmit
-npm test
+npm test -- --runInBand
+npx expo export --platform web
+```
 
 Não remover ou enfraquecer testes para fazer código passar.
 
-## Persistência
+## Documentação viva
 
-Próxima tarefa: persistência local com AsyncStorage.
+DOCUMENTATION IS PART OF THE IMPLEMENTATION.
 
-Arquitetura desejada:
+A documentação oficial está em `docs/` e deve refletir sempre o código real.
+Uma tarefa não está concluída se o código mudou e a documentação afetada ficou
+desatualizada. Diferencie explicitamente `IMPLEMENTADO`, `PLANEJADO`, `FUTURO`
+e `DEPRECIADO`; nunca descreva planejamento como funcionalidade disponível.
 
-AppContext
-├── Services
-└── PersistenceService → AsyncStorage
+Em toda tarefa:
 
-Requisitos:
-- estado completo persistido
-- versionamento do formato
-- restaurar Date corretamente
-- carregar estado antes de mostrar o app
-- seed apenas quando não houver estado salvo
-- tratar dados inválidos
-- adicionar testes de persistência
-- manter os 54 testes atuais passando
+1. implementar;
+2. testar;
+3. identificar a documentação afetada;
+4. atualizar apenas os arquivos `docs/*.md` correspondentes;
+5. atualizar `docs/11-historico-de-desenvolvimento.md` quando houver nova fase
+   ou decisão arquitetural relevante;
+6. atualizar a seção “Última validação conhecida” de
+   `docs/10-testes-e-qualidade.md` quando a suíte completa for executada;
+7. revisar código e documentação em conjunto;
+8. executar `git diff --check`;
+9. commit;
+10. push.
 
-Não implementar backend, Spring Boot ou PostgreSQL ainda.
+Exemplos de roteamento:
+
+- autenticação: `04-autenticacao-e-seguranca.md` e, conforme o impacto,
+  `07-backend-api.md`/`08-frontend-mobile-web.md`;
+- banco: `06-banco-de-dados.md` e `09-infraestrutura-e-deploy.md`;
+- visual: `01-manual-do-usuario.md` e `08-frontend-mobile-web.md`.
+
+Nunca registrar senhas, tokens, connection strings reais, cookies, certificados
+privados ou dados privados na documentação.
+
+## Frontend visual congelado
+
+O frontend visual/UX está congelado. Até autorização explícita, não redesenhar,
+alterar estética, reorganizar navegação nem mudar a identidade visual. Somente
+alterações técnicas necessárias são permitidas. Um redesign futuro ocorrerá
+após feedback dos chefes/usuários.
 
 ## Git
 
