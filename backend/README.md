@@ -132,3 +132,122 @@ O backend não serve os assets do Expo Web. A CSP deve ser definida no hosting
 estático depois que os domínios reais de scripts, fontes, imagens e conexões
 forem conhecidos. Não foi adicionada uma CSP genérica à API para evitar uma
 política ineficaz ou incompatível com o bundle Web.
+
+## PostgreSQL de produção
+
+O ambiente validado usa PostgreSQL 17. A produção deve usar PostgreSQL
+gerenciado, preferencialmente na mesma região e por rede privada. A conexão é
+direta: não usar PgBouncer nesta etapa, pois a idempotência depende de
+`pg_advisory_xact_lock` transacional e `hashtextextended`. O schema também usa
+`jsonb`, locks pessimistas, transações e isolamento `REPEATABLE_READ`; essas são
+dependências explícitas de PostgreSQL.
+
+Configuração obrigatória, sempre como secrets externos ao container:
+
+- `SPRING_PROFILES_ACTIVE=prod`
+- `DB_URL=jdbc:postgresql://<host>:5432/<database>?sslmode=verify-full`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `AUTH_JWT_SECRET`
+
+Para rede pública, TLS e validação do servidor são obrigatórios. Use
+`sslmode=verify-full` e a CA fornecida pelo provedor, instalada como secret no
+runtime e referenciada, quando necessária, por
+`sslrootcert=/caminho/montado/ca.crt` na `DB_URL`. Alguns provedores usam uma CA
+pública já reconhecida pela imagem. Não use `sslmode=disable`, `allow` ou
+`require` quando estes não validarem a identidade do servidor, e nunca inclua
+CA privada, URL ou credenciais reais no Git. Em rede privada, siga a exigência
+TLS do provedor; prefira TLS mesmo assim.
+
+O Hikari usa um pool pequeno e todas as opções podem ser ajustadas no ambiente:
+
+| Variável | Default |
+| --- | ---: |
+| `DB_POOL_MAX_SIZE` | `5` |
+| `DB_POOL_MIN_IDLE` | `1` |
+| `DB_POOL_CONNECTION_TIMEOUT_MS` | `10000` |
+| `DB_POOL_VALIDATION_TIMEOUT_MS` | `3000` |
+| `DB_POOL_IDLE_TIMEOUT_MS` | `600000` |
+| `DB_POOL_MAX_LIFETIME_MS` | `1800000` |
+
+Mantenha `maxLifetime` abaixo do limite de conexão do provedor. Não aumente o
+pool sem medir demanda e respeitar o limite total de conexões do banco.
+
+### Flyway, bootstrap e restart
+
+O Spring aplica V1–V15 automaticamente antes de validar o modelo JPA. Não rode
+migrations manualmente e nunca edite migrations publicadas; mudanças futuras
+começam em V16. Em banco vazio, V2 cria Rodrigo e Cesar e o primeiro startup
+exige `AUTH_INITIAL_PASSWORD_RODRIGO` e `AUTH_INITIAL_PASSWORD_CESAR`. Elas são
+secrets temporários, não são registradas em log e podem ser removidas após o
+primeiro startup saudável confirmar os hashes — idealmente depois que ambos
+trocarem a senha inicial obrigatória.
+
+Reiniciar o backend com o banco preservado apenas valida as migrations já
+aplicadas: usuários, revisão, comandos idempotentes, sessões e dados permanecem.
+`/api/v1/health/readiness` responde `DOWN` antes da inicialização completa, com
+banco indisponível em runtime ou migrations pendentes, sem expor detalhes; volta
+a `UP` quando conexão, Flyway e aplicação estão saudáveis. Se conexão ou
+migration falhar durante o startup, o Spring falha fechado e o endpoint fica
+indisponível (container não-ready) até a infraestrutura ser corrigida.
+
+### Backup e restore
+
+Requisitos mínimos do serviço gerenciado:
+
+- backup automático diário com retenção mínima de 7 dias;
+- point-in-time recovery, se couber no plano;
+- restore testado em banco separado após a criação e periodicamente;
+- dump lógico periódico antes de migrations relevantes e conforme o risco.
+
+Exemplos sem credenciais embutidas (use uma URL PostgreSQL fornecida como secret
+no shell e TLS validado):
+
+```bash
+pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges \
+  --file=/caminho-seguro/stockflow.dump
+createdb "$RESTORE_DATABASE_URL"
+pg_restore --dbname="$RESTORE_DATABASE_URL" --clean --if-exists \
+  --no-owner --no-privileges /caminho-seguro/stockflow.dump
+```
+
+O teste local reproduz Banco A → dado marcador → dump → Banco B → restore →
+startup/Flyway → readiness → conferência do dado. Ele usa nomes isolados,
+arquivo temporário fora do repositório e remove os recursos ao terminar:
+
+```bash
+cd backend
+./scripts/test-backup-restore.sh
+```
+
+Para repetir o smoke test no banco remoto, restaure primeiro em uma instância
+descartável, aponte uma única instância do backend para ela e confirme: 15
+migrations com sucesso, readiness `UP`, snapshot e dados esperados. Execute
+também `mvn test`: o teste PostgreSQL real envia duas operações concorrentes com
+o mesmo `commandId`, comprova um único movimento/revisão/resultado e confirma
+que rollback libera o advisory lock para uma nova tentativa.
+
+### Operação e capacidade
+
+O job diário remove sessões refresh e comandos idempotentes conforme
+`AUTH_REFRESH_RETENTION_DAYS` e `IDEMPOTENCY_RETENTION_DAYS`; os testes exercitam
+as consultas no PostgreSQL real. Históricos, movimentos, abastecimentos,
+retiradas, consumos e eventos de reserva ainda crescem sem retenção. Monitorar
+tamanho, índices e duração dos backups; paginação e snapshots incrementais não
+fazem parte desta fase.
+
+Troubleshooting básico:
+
+- timeout de conexão: conferir região/rede privada, allowlist, DNS, porta e
+  limites do pool;
+- erro TLS: conferir hostname da URL, CA montada e requisitos do provedor, sem
+  reduzir `sslmode`;
+- startup interrompido: consultar erro do Flyway e conectividade; não executar
+  SQL corretivo manual nem alterar V1–V15;
+- readiness `DOWN`: conferir saúde do PostgreSQL, credenciais e migrations nos
+  logs sanitizados do backend.
+
+Antes de contratar o banco, registrar região, host/URL JDBC, database, username,
+password, requisitos/CA de SSL, disponibilidade de rede privada, política de
+backup/retenção e procedimento de restore. O repositório permanece portátil e
+não cria nem contrata infraestrutura automaticamente.

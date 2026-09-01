@@ -254,15 +254,21 @@ class MovimentoEstoquePrincipalIntegrationTest {
         try {
             var primeira = executor.submit(() -> movimentar(
                     commandId, "ENTRADA", item("MIX", 10)
-            ).andReturn().getResponse().getStatus());
+            ).andReturn().getResponse());
             var segunda = executor.submit(() -> movimentar(
                     commandId, "ENTRADA", item("MIX", 10)
-            ).andReturn().getResponse().getStatus());
+            ).andReturn().getResponse());
 
-            assertThat(primeira.get()).isEqualTo(201);
-            assertThat(segunda.get()).isEqualTo(201);
+            var primeiraResposta = primeira.get();
+            var segundaResposta = segunda.get();
+            assertThat(primeiraResposta.getStatus()).isEqualTo(201);
+            assertThat(segundaResposta.getStatus()).isEqualTo(201);
+            assertThat(segundaResposta.getContentAsString())
+                    .isEqualTo(primeiraResposta.getContentAsString());
             assertThat(saldo("MIX")).isEqualTo(310);
             assertThat(contagem("movimentos_estoque_principal")).isEqualTo(1);
+            assertThat(contagem("comandos_processados")).isEqualTo(1);
+            assertThat(revisao()).isEqualTo(1);
         } finally {
             executor.shutdownNow();
         }
@@ -274,6 +280,15 @@ class MovimentoEstoquePrincipalIntegrationTest {
         movimentar(commandId, "SAIDA", item("MILHO", 51))
                 .andExpect(status().isBadRequest());
         assertThat(contagem("comandos_processados")).isZero();
+        assertThat(revisao()).isZero();
+
+        movimentar(commandId, "ENTRADA", item("MILHO", 1))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.revisao").value(1));
+
+        assertThat(saldo("MILHO")).isEqualTo(51);
+        assertThat(contagem("comandos_processados")).isEqualTo(1);
+        assertThat(revisao()).isEqualTo(1);
     }
 
     private org.springframework.test.web.servlet.ResultActions movimentar(
@@ -324,6 +339,13 @@ class MovimentoEstoquePrincipalIntegrationTest {
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM " + tabela,
                 Integer.class
+        );
+    }
+
+    private long revisao() {
+        return jdbcTemplate.queryForObject(
+                "SELECT revisao FROM revisao_estado WHERE id = 1",
+                Long.class
         );
     }
 }

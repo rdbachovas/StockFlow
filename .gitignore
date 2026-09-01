@@ -18,6 +18,11 @@ web-build/
 .env.*
 !mobile/.env.example
 
+# Database backups
+*.dump
+*.backup
+*.sql.gz
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
